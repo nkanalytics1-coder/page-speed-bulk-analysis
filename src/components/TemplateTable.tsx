@@ -48,14 +48,14 @@ function Row({
   return (
     <>
       <tr
-        className="cursor-pointer border-t border-border align-top hover:bg-surface"
+        className="cursor-pointer border-t border-border align-top hover:bg-surface-alt"
         onClick={() => setOpen((value) => !value)}
       >
         <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
           <select
             value={summary.pageType}
             onChange={(event) => onTypeChange(summary.pattern, event.target.value)}
-            className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+            className="w-full rounded border border-border bg-card px-2 py-1 text-sm"
           >
             {PAGE_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -70,7 +70,7 @@ function Row({
             onChange={(event) =>
               onImportanceChange(summary.pattern, event.target.value as Importance)
             }
-            className={`w-full rounded border bg-background px-2 py-1 text-sm ${
+            className={`w-full rounded border bg-card px-2 py-1 text-sm ${
               IMPORTANCE_STYLES[summary.importance]
             }`}
           >
@@ -132,7 +132,7 @@ function Row({
       </tr>
 
       {open ? (
-        <tr className="border-t border-border bg-surface">
+        <tr className="border-t border-border bg-surface-alt">
           <td colSpan={10} className="px-3 py-4">
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
@@ -239,7 +239,7 @@ export function TemplateTable({
   if (summaries.length === 0) return null;
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border bg-card">
       <table className="w-full min-w-[74rem] text-left">
         <thead className="bg-surface-alt text-xs text-ink-muted">
           <tr>

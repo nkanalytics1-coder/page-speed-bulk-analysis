@@ -118,7 +118,7 @@ function Field({
   return (
     <div>
       <label className="block text-sm">{label}</label>
-      <p className="mt-0.5 text-xs leading-relaxed text-ink-faint">{hint}</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{hint}</p>
       <div className="mt-2">{children}</div>
     </div>
   );
@@ -580,7 +580,7 @@ export function Analyzer() {
       ) : null}
 
       {/* ------------------------------------------------------- Step 1 */}
-      <section className="rounded-lg border border-border p-5">
+      <section className="rounded-lg border border-border bg-card p-5">
         <StepHeading
           number={1}
           title="Il tuo sito"
@@ -604,7 +604,7 @@ export function Analyzer() {
                 type="button"
                 onClick={importSitemap}
                 disabled={sitemapBusy || !sitemapInput.trim()}
-                className="rounded border border-border px-4 py-2 text-sm hover:bg-surface disabled:opacity-40"
+                className="rounded border border-border px-4 py-2 text-sm hover:bg-surface-alt disabled:opacity-40"
               >
                 {sitemapBusy ? "Leggo…" : "Importa le pagine"}
               </button>
@@ -626,7 +626,7 @@ export function Analyzer() {
           </Field>
 
           {urls.length > 0 ? (
-            <div className="rounded border border-border bg-surface px-3 py-2">
+            <div className="rounded border border-border bg-surface-alt px-3 py-2">
               <p className="text-sm">
                 {urls.length} indirizzi, raggruppati in {templates.length} template.
                 Controllandone {samplesPerTemplate} per gruppo bastano{" "}
@@ -720,7 +720,7 @@ export function Analyzer() {
 
       {/* ------------------------------------------------------- Step 2 */}
       {scanned ? (
-        <section className="rounded-lg border border-border p-5">
+        <section className="rounded-lg border border-border bg-card p-5">
           <StepHeading
             number={2}
             title="Come va il sito, per tipo di pagina"
@@ -819,7 +819,7 @@ export function Analyzer() {
 
       {/* ------------------------------------------------------- Step 3 */}
       {scanned ? (
-        <section className="rounded-lg border border-border p-5">
+        <section className="rounded-lg border border-border bg-card p-5">
           <StepHeading
             number={3}
             title="Confronto con i concorrenti"
@@ -872,7 +872,7 @@ export function Analyzer() {
 
       {/* ------------------------------------------------------- Step 4 */}
       {jobs.length > 0 ? (
-        <section className="rounded-lg border border-border p-5">
+        <section className="rounded-lg border border-border bg-card p-5">
           <StepHeading
             number={4}
             title="Diagnosi: cosa correggere"
@@ -902,7 +902,7 @@ export function Analyzer() {
 
           {lighthouseRuns.length > 0 && !selectedRun ? (
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-6 rounded-lg border border-border p-5">
+              <div className="flex flex-wrap gap-6 rounded-lg border border-border bg-card p-5">
                 {CATEGORY_IDS.map((category) => {
                   const scores = lighthouseRuns
                     .map((run) => run.categories[category]?.score)
@@ -924,7 +924,7 @@ export function Analyzer() {
 
               <ActionPlanTable items={plan.items} />
 
-              <div className="overflow-x-auto rounded-lg border border-border">
+              <div className="overflow-x-auto rounded-lg border border-border bg-card">
                 <table className="w-full min-w-[40rem] text-left">
                   <thead className="bg-surface-alt text-xs text-ink-muted">
                     <tr>

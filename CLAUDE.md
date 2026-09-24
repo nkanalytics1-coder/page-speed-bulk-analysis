@@ -100,12 +100,27 @@ riflettono il fatto che lo strumento nasce per la velocità. Sono in cima a
 - Se aggiungi dipendenze, esegui `npm install` prima del push
 
 ## UI — regole fisse (non derogabili)
-- **Font**: unico font consentito è **Open Sans Light** (weight 300), caricato
-  via `next/font/google` in `src/app/layout.tsx` e applicato come `font-sans`
-  globale. Nessun altro font, nessun altro peso: la gerarchia visiva si
-  costruisce con dimensione e colore.
-- **Tema**: sempre **chiaro**. Nessuna dark mode, nemmeno via
-  `prefers-color-scheme`.
+
+Il sistema visivo è allineato agli altri strumenti, nkai.dev in particolare: i
+token in `src/app/globals.css` sono i suoi valori HSL, ripresi uno a uno. Se
+cambia lo stile di riferimento, si aggiornano lì e basta.
+
+- **Font**: **Open Sans**, peso base 300, con 500 per pulsanti e testo in
+  evidenza — è la coppia usata dagli altri strumenti. **JetBrains Mono** per
+  URL, percorsi e codice. Nessun altro font.
+- **Tema**: sempre **chiaro**. La libreria di origine definisce anche un tema
+  scuro: quei valori non sono stati riportati, e non vanno aggiunti.
+- **Struttura**: fondo pagina grigio freddo (`background`), riquadri bianchi
+  (`card`) con bordo e raggio `0.625rem`. È l'inverso del "tutto bianco":
+  se aggiungi un contenitore, deve avere `bg-card`.
+- **Colori dei punteggi**: `pass` / `average` / `fail` restano quelli di
+  Lighthouse (verde, arancione, rosso). Sono una convenzione riconoscibile da
+  chi legge report di performance: non vanno sostituiti con la palette del
+  sito, che renderebbe gauge e tabelle meno leggibili.
+- **Contrasto**: `ink-faint` è volutamente più scuro del grigio chiaro del
+  riferimento, che su bianco sta sotto 3:1. Uno strumento che misura
+  l'accessibilità non può avere testo illeggibile. Le descrizioni sotto i
+  campi usano `ink-muted`, non `ink-faint`.
 
 ## Variabili d'ambiente
 - `PAGESPEED_API_KEY` — chiave PageSpeed Insights (vedi `.env.example`).

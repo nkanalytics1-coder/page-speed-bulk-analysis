@@ -48,7 +48,7 @@ export function CompetitorTable({ rows }: { rows: CompetitorRow[] }) {
   const self = rows.find((row) => row.isSelf) ?? null;
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border bg-card">
       <table className="w-full min-w-[48rem] text-left">
         <thead className="bg-surface-alt text-xs text-ink-muted">
           <tr>
@@ -122,7 +122,7 @@ export function CompetitorTable({ rows }: { rows: CompetitorRow[] }) {
         </tbody>
       </table>
 
-      <p className="border-t border-border bg-surface px-3 py-2 text-xs leading-relaxed text-ink-muted">
+      <p className="border-t border-border bg-surface-alt px-3 py-2 text-xs leading-relaxed text-ink-muted">
         Valori al 75° percentile degli utenti reali di Chrome, ultimi 28 giorni.
         La differenza sotto ogni valore è rispetto al tuo sito: in verde quando
         sei più veloce tu. Dove l&apos;ambito è &quot;Intero sito&quot;, CrUX non

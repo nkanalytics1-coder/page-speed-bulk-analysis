@@ -89,7 +89,7 @@ function DetailTable({ audit }: { audit: NormalizedAudit }) {
         </tbody>
       </table>
       {table.totalItems > table.items.length ? (
-        <p className="border-t border-border bg-surface px-3 py-2 text-xs text-ink-muted">
+        <p className="border-t border-border bg-surface-alt px-3 py-2 text-xs text-ink-muted">
           Mostrate {table.items.length} righe su {table.totalItems}. L&apos;elenco
           completo è nel report Lighthouse originale.
         </p>
@@ -115,7 +115,7 @@ export function AuditItem({ audit }: { audit: NormalizedAudit }) {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface"
+        className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface-alt"
         aria-expanded={open}
       >
         <RatingMark score={audit.score} />

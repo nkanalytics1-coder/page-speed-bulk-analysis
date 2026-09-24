@@ -48,7 +48,7 @@ export function Gauge({ score, label, size = "md" }: GaugeProps) {
         aria-label={`${label ?? "Punteggio"}: ${formatScore(score)} su 100`}
       >
         <div
-          className="absolute rounded-full bg-background flex items-center justify-center"
+          className="absolute rounded-full bg-card flex items-center justify-center"
           style={holeStyle}
         >
           <span

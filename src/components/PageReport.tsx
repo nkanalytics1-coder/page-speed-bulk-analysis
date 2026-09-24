@@ -40,11 +40,11 @@ function Section({
   if (count === 0) return null;
 
   return (
-    <section className="rounded-lg border border-border">
+    <section className="rounded-lg border border-border bg-card">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-surface"
+        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-surface-alt"
         aria-expanded={open}
       >
         <span className="text-sm">
@@ -60,7 +60,7 @@ function Section({
 
 function FieldPanel({ field, title }: { field: FieldData; title: string }) {
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h3 className="text-sm">{title}</h3>
         {field.overallCategory ? (
@@ -193,7 +193,7 @@ export function PageReport({ run }: { run: RunResult }) {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-lg border border-border bg-surface p-5">
+      <header className="rounded-lg border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <a
@@ -226,7 +226,7 @@ export function PageReport({ run }: { run: RunResult }) {
             <img
               src={run.screenshot}
               alt={`Screenshot di ${run.requestedUrl}`}
-              className="h-auto w-20 rounded border border-border bg-background"
+              className="h-auto w-20 rounded border border-border bg-card"
             />
           ) : null}
         </div>
@@ -251,7 +251,7 @@ export function PageReport({ run }: { run: RunResult }) {
         ) : null}
       </header>
 
-      <section className="rounded-lg border border-border p-5">
+      <section className="rounded-lg border border-border bg-card p-5">
         <h2 className="mb-4 text-sm text-ink-muted">
           Metriche di laboratorio
         </h2>

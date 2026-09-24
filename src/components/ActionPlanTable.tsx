@@ -18,7 +18,7 @@ function Row({ item, rank }: { item: ActionItem; rank: number }) {
   return (
     <>
       <tr
-        className="cursor-pointer border-t border-border align-top hover:bg-surface"
+        className="cursor-pointer border-t border-border align-top hover:bg-surface-alt"
         onClick={() => setOpen((value) => !value)}
       >
         <td className="px-3 py-3 text-xs text-ink-faint tabular-nums">{rank}</td>
@@ -62,7 +62,7 @@ function Row({ item, rank }: { item: ActionItem; rank: number }) {
         </td>
       </tr>
       {open ? (
-        <tr className="border-t border-border bg-surface">
+        <tr className="border-t border-border bg-surface-alt">
           <td />
           <td colSpan={6} className="px-3 py-4">
             <p className="max-w-3xl text-sm leading-relaxed text-ink-muted">
@@ -112,7 +112,7 @@ export function ActionPlanTable({ items }: { items: ActionItem[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border bg-card">
       <table className="w-full min-w-[56rem] text-left">
         <thead className="bg-surface-alt text-xs text-ink-muted">
           <tr>

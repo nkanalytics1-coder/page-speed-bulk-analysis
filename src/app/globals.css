@@ -1,35 +1,72 @@
 @import "tailwindcss";
 
 /*
- * Tema chiaro fisso: nessuna variante dark, come da regole di progetto.
- * La palata di colori replica quella del report Lighthouse ufficiale.
+ * Sistema visivo allineato agli altri strumenti (nkai.dev): stessa
+ * convenzione shadcn/ui, stessi valori HSL, stesso raggio, stesso font.
+ * Il tema resta chiaro come da regole di progetto: i valori scuri della
+ * libreria di origine non sono stati riportati.
  */
 @theme {
-  --color-background: #ffffff;
-  --color-surface: #f8f9fa;
-  --color-surface-alt: #f1f3f4;
-  --color-border: #e3e6e8;
-  --color-border-strong: #c7ccd1;
-  --color-ink: #1f2933;
-  --color-ink-muted: #5f6771;
-  --color-ink-faint: #8a9199;
+  /* Sfondo della pagina: grigio freddo, non bianco. Il bianco è dei riquadri. */
+  --color-background: hsl(220 25% 97%);
+  --color-foreground: hsl(224 40% 12%);
 
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(224 40% 12%);
+
+  --color-primary: hsl(234 85% 56%);
+  --color-primary-foreground: hsl(0 0% 100%);
+
+  --color-secondary: hsl(220 20% 93%);
+  --color-secondary-foreground: hsl(224 40% 18%);
+
+  --color-muted: hsl(220 18% 94%);
+  --color-muted-foreground: hsl(220 12% 50%);
+
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+
+  --color-border: hsl(220 18% 88%);
+  --color-input: hsl(220 18% 88%);
+  --color-ring: hsl(234 85% 56%);
+
+  --radius-sm: calc(0.625rem - 4px);
+  --radius-md: calc(0.625rem - 2px);
+  --radius-lg: 0.625rem;
+  --radius-xl: calc(0.625rem + 4px);
+
+  /*
+   * Alias semantici usati dai componenti di questo progetto, mappati sui
+   * token qui sopra: un solo punto di verità per i colori.
+   */
+  --color-surface: hsl(0 0% 100%);
+  --color-surface-alt: hsl(220 18% 94%);
+  --color-border-strong: hsl(220 16% 78%);
+  --color-ink: hsl(224 40% 12%);
+  --color-ink-muted: hsl(220 12% 50%);
+  /* Scurito rispetto al riferimento: a 62% di luminosità il contrasto su
+     bianco scende sotto 3:1, illeggibile per il testo piccolo. */
+  --color-ink-faint: hsl(220 12% 45%);
+  --color-accent: hsl(234 85% 56%);
+  --color-accent-soft: hsl(230 60% 95%);
+
+  /*
+   * Colori di stato dei punteggi. Restano quelli di Lighthouse: sono una
+   * convenzione che chi legge un report di performance riconosce a colpo
+   * d'occhio, e sostituirli con la palette del sito renderebbe gauge e
+   * tabelle meno leggibili, non più coerenti.
+   */
   --color-pass: #0cce6b;
-  --color-pass-soft: #e9f7ef;
+  --color-pass-soft: #e6f8ef;
   --color-average: #ffa400;
-  --color-average-soft: #fff6e5;
-  --color-fail: #ff4e42;
-  --color-fail-soft: #fdecea;
-  --color-accent: #1a73e8;
-  --color-accent-soft: #e8f0fe;
+  --color-average-soft: #fff5e3;
+  --color-fail: hsl(0 72% 51%);
+  --color-fail-soft: hsl(0 72% 96%);
 
   --font-sans: var(--font-open-sans), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
-/*
- * Un solo peso in tutta l'interfaccia: Open Sans Light 300.
- * La gerarchia visiva è costruita con dimensione e colore, non con il peso.
- */
 :root {
   color-scheme: light;
 }
@@ -38,9 +75,13 @@ html {
   background: var(--color-background);
 }
 
+/*
+ * Peso base 300, come su nkai.dev. La stessa libreria usa 500 per gli
+ * elementi interattivi e il testo in evidenza: è l'unica altra gradazione.
+ */
 body {
   background: var(--color-background);
-  color: var(--color-ink);
+  color: var(--color-foreground);
   font-weight: 300;
 }
 
@@ -51,11 +92,14 @@ h4,
 h5,
 h6,
 th,
-strong,
-b,
-button,
 label {
   font-weight: 300;
+}
+
+button,
+strong,
+b {
+  font-weight: 500;
 }
 
 /* Anello del gauge Lighthouse: un conic-gradient guidato da --gauge-value. */
@@ -66,7 +110,13 @@ label {
   );
 }
 
-/* Barra di avanzamento indeterminata durante l'analisi di una pagina. */
+/* Riquadro bianco su fondo grigio: l'unità di base del layout. */
+@utility panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
 @keyframes sweep {
   0% {
     transform: translateX(-100%);
@@ -78,14 +128,4 @@ label {
 
 @utility animate-sweep {
   animation: sweep 1.4s ease-in-out infinite;
-}
-
-/* Le tabelle di dettaglio Lighthouse possono essere larghe: scroll orizzontale. */
-@utility scroll-shadow {
-  background:
-    linear-gradient(to right, var(--color-background) 30%, transparent),
-    linear-gradient(to right, transparent, var(--color-background) 70%) 100% 0;
-  background-repeat: no-repeat;
-  background-size: 2rem 100%;
-  background-attachment: local, local;
 }
