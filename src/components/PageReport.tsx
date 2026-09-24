@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
 import { AuditItem } from "./AuditItem";
 import { Gauge } from "./Gauge";
 import { formatFieldValue } from "@/lib/format";
@@ -220,12 +219,13 @@ export function PageReport({ run }: { run: RunResult }) {
           </div>
 
           {run.screenshot ? (
-            <Image
+            // Lighthouse restituisce lo screenshot come data URI base64 di
+            // dimensioni ignote: next/image documenta i data URI solo per
+            // placeholder/blurDataURL, e qui non c'è nulla da ottimizzare.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
               src={run.screenshot}
               alt={`Screenshot di ${run.requestedUrl}`}
-              width={96}
-              height={170}
-              unoptimized
               className="h-auto w-20 rounded border border-border bg-background"
             />
           ) : null}
