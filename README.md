@@ -48,9 +48,10 @@ Mettila in `.env.local` come `PAGESPEED_API_KEY`, e su Vercel in
 
 ## Deploy su Vercel
 
-1. Pusha la repo su GitHub.
+1. Pusha la repo su GitHub. **Fallo prima di importare il progetto su Vercel**:
+   vedi la nota sul Framework Preset più sotto.
 2. Su [vercel.com](https://vercel.com) → **Add New Project** → importa la repo.
-3. Framework preset: **Next.js** (rilevato in automatico).
+3. Framework preset: deve essere **Next.js**. Verificalo, non darlo per scontato.
 4. Aggiungi `PAGESPEED_API_KEY` fra le Environment Variables **prima** del primo
    deploy.
 5. Deploy. Da qui ogni push su `main` ne fa partire uno nuovo.
@@ -58,6 +59,30 @@ Mettila in `.env.local` come `PAGESPEED_API_KEY`, e su Vercel in
 Le route `/api/analyze` e `/api/export` dichiarano `maxDuration = 60`: sul piano
 Hobby è il massimo consentito ed è sufficiente, perché ogni invocazione gestisce
 una sola analisi.
+
+### Se il sito risponde 404 dopo un deploy riuscito
+
+Controlla **Settings → Build and Deployment → Framework Preset**: deve essere
+**Next.js**. Se è su `Other`, Vercel esegue comunque `npm run build` e il deploy
+risulta Ready, ma poi pubblica solo la cartella `public/` come sito statico e
+scarta l'output server di Next: home, API e `/_next/static/` rispondono 404
+mentre i file dentro `public/` rispondono 200. È il sintomo che distingue questo
+caso da un problema di dominio.
+
+Succede quando il progetto viene importato su Vercel **prima** che il codice sia
+su GitHub: Vercel ispeziona una repo vuota, non trova `package.json` e ripiega
+su `Other`. Il preset non viene ri-rilevato dopo il primo push: va corretto a
+mano, e poi serve un nuovo deploy perché l'alias di produzione resta agganciato
+al vecchio build finché non ne arriva uno nuovo.
+
+### Se un'analisi va in timeout
+
+L'API PageSpeed Insights occasionalmente supera i 55 secondi su pagine pesanti,
+e la route interrompe la chiamata per restituire un errore pulito invece di far
+scadere la funzione. L'errore è marcato come ritentabile e il client riprova
+fino a 3 volte con backoff, quindi di norma si risolve da solo. Misurato in
+produzione su una pagina pesante: 2 successi a circa 30s e un timeout su 3
+tentativi.
 
 ## Come leggere le priorità
 
