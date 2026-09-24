@@ -85,7 +85,18 @@ export function CompetitorTable({ rows }: { rows: CompetitorRow[] }) {
                 {row.result ? (
                   <CwvBadge passes={row.result.passesCwv} size="sm" />
                 ) : (
-                  <span className="text-xs text-ink-faint">{row.miss}</span>
+                  <>
+                    <span className="block text-xs text-ink-faint">
+                      {row.miss}
+                    </span>
+                    {/* Errore facilissimo: molti siti vivono solo su www, e
+                        l'altra forma non ha dati perché reindirizza. */}
+                    {!row.label.startsWith("www.") ? (
+                      <span className="mt-1 block text-xs text-average">
+                        Prova con www.{row.label}
+                      </span>
+                    ) : null}
+                  </>
                 )}
               </td>
               {CWV_COLUMNS.map((id) => {

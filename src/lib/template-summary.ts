@@ -30,6 +30,8 @@ export interface MetricSummary {
 export interface TemplateSummary {
   pattern: string;
   label: string;
+  /** Tipo di pagina: proposto dall'euristica, confermato o corretto dall'utente. */
+  pageType: string;
   /** URL totali del sito che ricadono in questo template. */
   totalUrls: number;
   /** URL effettivamente interrogate. */
@@ -98,6 +100,8 @@ const LCP_PHASES: LcpPhaseId[] = [
 export function summarizeTemplate(
   template: Template,
   results: CruxResult[],
+  /** Tipo scelto dall'utente; in assenza si usa quello dedotto dal percorso. */
+  pageType?: string,
 ): TemplateSummary {
   const metrics: TemplateSummary["metrics"] = {};
 
@@ -178,6 +182,7 @@ export function summarizeTemplate(
   return {
     pattern: template.pattern,
     label: template.label,
+    pageType: pageType ?? template.suggestedType,
     totalUrls: template.urls.length,
     sampled: template.sample.length,
     withData: results.length,

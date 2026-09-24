@@ -47,10 +47,10 @@ for (const target of targets) {
     ).toFixed(0)}% del totale)\n`,
   );
 
-  console.log("  URL  pattern                                   etichetta");
+  console.log("  URL  pattern                                   tipo proposto");
   for (const t of templates.slice(0, 18)) {
     console.log(
-      `  ${String(t.urls.length).padStart(4)}  ${t.pattern.slice(0, 42).padEnd(42)} ${t.label}`,
+      `  ${String(t.urls.length).padStart(4)}  ${t.pattern.slice(0, 42).padEnd(42)} ${t.suggestedType.padEnd(22)} ${t.label}`,
     );
   }
   if (templates.length > 18) {

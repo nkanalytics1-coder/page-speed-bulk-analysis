@@ -6,11 +6,12 @@ export default function Home() {
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10">
       <header className="mb-8">
-        <h1 className="text-2xl">Lighthouse Batch Audit</h1>
+        <h1 className="text-2xl">Analisi velocità di un sito</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
-          Analizza più pagine di un sito in una sola sessione con il motore
-          Lighthouse di Google. Ottieni il report completo per ogni pagina e un
-          piano di intervento ordinato per impatto, scaricabile in Excel.
+          Controlla come va un sito intero in pochi secondi usando i dati degli
+          utenti reali di Chrome, poi approfondisci con Lighthouse solo dove
+          serve. Alla fine scarichi un Excel con le cose da fare in ordine di
+          priorità.
         </p>
       </header>
 

@@ -43,19 +43,98 @@ function isNumericSegment(segment: string): boolean {
   return /^\d+$/.test(segment);
 }
 
-/** Etichette per i segmenti di percorso più comuni. */
-const SEGMENT_LABELS: Record<string, string> = {
+/**
+ * Tipi di pagina proposti all'utente.
+ *
+ * Il tipo non serve al calcolo: serve a chi legge il report. "Tutte le schede
+ * prodotto falliscono l'LCP" è una frase su cui si agisce, "il template /p/*
+ * fallisce" no. Lo strumento lo indovina dall'URL e lascia correggere, perché
+ * dal percorso non è sempre deducibile.
+ */
+export const PAGE_TYPES = [
+  "Home",
+  "Scheda prodotto",
+  "Categoria / listing",
+  "Articolo / blog",
+  "Landing page",
+  "Checkout / carrello",
+  "Ricerca",
+  "Documentazione",
+  "Istituzionale",
+  "Archivio (tag, autore)",
+  "Altro",
+] as const;
+
+export type PageType = (typeof PAGE_TYPES)[number];
+
+/** Segmenti di percorso che rivelano il tipo di pagina. */
+const SEGMENT_TYPES: Record<string, PageType> = {
   prodotto: "Scheda prodotto",
   prodotti: "Scheda prodotto",
   product: "Scheda prodotto",
   products: "Scheda prodotto",
   p: "Scheda prodotto",
+  dp: "Scheda prodotto",
+  annuncio: "Scheda prodotto",
+  annunci: "Categoria / listing",
+  categoria: "Categoria / listing",
+  categorie: "Categoria / listing",
+  category: "Categoria / listing",
+  collections: "Categoria / listing",
+  collection: "Categoria / listing",
+  shop: "Categoria / listing",
+  c: "Categoria / listing",
+  blog: "Articolo / blog",
+  news: "Articolo / blog",
+  notizie: "Articolo / blog",
+  articolo: "Articolo / blog",
+  articoli: "Articolo / blog",
+  post: "Articolo / blog",
+  magazine: "Articolo / blog",
+  changelog: "Articolo / blog",
+  guide: "Documentazione",
+  guida: "Documentazione",
+  docs: "Documentazione",
+  doc: "Documentazione",
+  documentazione: "Documentazione",
+  kb: "Documentazione",
+  help: "Documentazione",
+  supporto: "Documentazione",
+  tag: "Archivio (tag, autore)",
+  tags: "Archivio (tag, autore)",
+  autore: "Archivio (tag, autore)",
+  author: "Archivio (tag, autore)",
+  archivio: "Archivio (tag, autore)",
+  search: "Ricerca",
+  ricerca: "Ricerca",
+  cerca: "Ricerca",
+  checkout: "Checkout / carrello",
+  carrello: "Checkout / carrello",
+  cart: "Checkout / carrello",
+  ordine: "Checkout / carrello",
+  servizi: "Landing page",
+  servizio: "Landing page",
+  services: "Landing page",
+  chi_siamo: "Istituzionale",
+  "chi-siamo": "Istituzionale",
+  about: "Istituzionale",
+  contatti: "Istituzionale",
+  contact: "Istituzionale",
+  legal: "Istituzionale",
+  privacy: "Istituzionale",
+};
+
+/** Etichette descrittive, usate quando il tipo non è deducibile. */
+const SEGMENT_LABELS: Record<string, string> = {
+  prodotto: "Scheda prodotto",
+  prodotti: "Scheda prodotto",
+  product: "Scheda prodotto",
+  products: "Scheda prodotto",
   categoria: "Categoria",
   categorie: "Categoria",
   category: "Categoria",
   collections: "Categoria",
   collection: "Categoria",
-  c: "Categoria",
   blog: "Articolo",
   news: "Articolo",
   notizie: "Articolo",
@@ -63,8 +142,6 @@ const SEGMENT_LABELS: Record<string, string> = {
   articoli: "Articolo",
   post: "Articolo",
   magazine: "Articolo",
-  guide: "Guida",
-  guida: "Guida",
   docs: "Documentazione",
   documentazione: "Documentazione",
   tag: "Tag",
@@ -72,16 +149,30 @@ const SEGMENT_LABELS: Record<string, string> = {
   author: "Autore",
   search: "Ricerca",
   ricerca: "Ricerca",
-  servizi: "Servizio",
-  servizio: "Servizio",
-  services: "Servizio",
 };
+
+/** Tipo di pagina dedotto dal percorso, da confermare o correggere. */
+function suggestType(pattern: string): PageType {
+  if (pattern === "/") return "Home";
+  // Il gruppo residuo mette insieme pagine di natura diversa: qualsiasi tipo
+  // gli si attribuisse sarebbe un'ipotesi non giustificata.
+  if (pattern === SINGLETON_PATTERN) return "Altro";
+
+  for (const part of pattern.split("/").filter(Boolean)) {
+    if (part === "*") continue;
+    const known = SEGMENT_TYPES[part.toLowerCase()];
+    if (known) return known;
+  }
+  return "Altro";
+}
 
 export interface Template {
   /** Percorso normalizzato, es. "/blog/*". */
   pattern: string;
   /** Nome leggibile, es. "Articolo" o "Sezione /blog". */
   label: string;
+  /** Tipo di pagina dedotto dal percorso, modificabile dall'utente. */
+  suggestedType: PageType;
   /** Tutte le URL che ricadono in questo template. */
   urls: string[];
   /** Le URL scelte per l'analisi. */
@@ -254,6 +345,7 @@ export function groupByTemplate(
     return {
       pattern,
       label: labelFor(pattern, unique.length),
+      suggestedType: suggestType(pattern),
       urls: unique,
       sample: pickSample(unique, quota),
     };

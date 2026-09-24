@@ -545,8 +545,9 @@ function addTemplateSheet(
   const device = formFactor === "DESKTOP" ? "Desktop" : "Mobile";
 
   sheet.columns = [
-    { header: "Template", key: "label", width: 28 },
-    { header: "Percorso", key: "pattern", width: 32 },
+    { header: "Tipo di pagina", key: "pageType", width: 22 },
+    { header: "Template", key: "label", width: 26 },
+    { header: "Percorso", key: "pattern", width: 30 },
     { header: "Pagine nel sito", key: "totalUrls", width: 11 },
     { header: "Pagine analizzate", key: "sampled", width: 11 },
     { header: "Core Web Vitals", key: "cwv", width: 16 },
@@ -577,6 +578,7 @@ function addTemplateSheet(
     const cls = template.metrics.cumulative_layout_shift;
 
     const row = sheet.addRow({
+      pageType: template.pageType,
       label: template.label,
       pattern: template.pattern,
       totalUrls: template.totalUrls,

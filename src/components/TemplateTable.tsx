@@ -5,20 +5,30 @@ import { CwvBadge, CwvHeaderCells, LcpPhaseBar, MetricFromSummary } from "./CwvB
 import { CWV_COLUMNS } from "./CwvBits";
 import { METRIC_FULL_LABELS, formatMetric } from "@/lib/crux";
 import { shortUrl } from "@/lib/format";
+import { PAGE_TYPES } from "@/lib/templates";
 import type { TemplateSummary } from "@/lib/template-summary";
 
 interface Props {
   summaries: TemplateSummary[];
   /** Avvia la diagnosi Lighthouse sulle URL campionate di un template. */
   onDiagnose: (summary: TemplateSummary) => void;
+  /** Correzione del tipo di pagina proposto dall'euristica. */
+  onTypeChange: (pattern: string, pageType: string) => void;
   /** Pattern dei template già diagnosticati o in corso. */
   diagnosing: Set<string>;
   diagnosed: Set<string>;
 }
 
-function Row({ summary, onDiagnose, diagnosing, diagnosed }: {
+function Row({
+  summary,
+  onDiagnose,
+  onTypeChange,
+  diagnosing,
+  diagnosed,
+}: {
   summary: TemplateSummary;
   onDiagnose: (summary: TemplateSummary) => void;
+  onTypeChange: (pattern: string, pageType: string) => void;
   diagnosing: boolean;
   diagnosed: boolean;
 }) {
@@ -30,6 +40,19 @@ function Row({ summary, onDiagnose, diagnosing, diagnosed }: {
         className="cursor-pointer border-t border-border align-top hover:bg-surface"
         onClick={() => setOpen((value) => !value)}
       >
+        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
+          <select
+            value={summary.pageType}
+            onChange={(event) => onTypeChange(summary.pattern, event.target.value)}
+            className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+          >
+            {PAGE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </td>
         <td className="px-3 py-3">
           <span className="text-sm">{summary.label}</span>
           <span className="mt-0.5 block font-mono text-xs text-ink-faint">
@@ -82,7 +105,7 @@ function Row({ summary, onDiagnose, diagnosing, diagnosed }: {
 
       {open ? (
         <tr className="border-t border-border bg-surface">
-          <td colSpan={8} className="px-3 py-4">
+          <td colSpan={9} className="px-3 py-4">
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
                 <h4 className="mb-2 text-xs text-ink-muted">
@@ -180,6 +203,7 @@ function Row({ summary, onDiagnose, diagnosing, diagnosed }: {
 export function TemplateTable({
   summaries,
   onDiagnose,
+  onTypeChange,
   diagnosing,
   diagnosed,
 }: Props) {
@@ -187,9 +211,10 @@ export function TemplateTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[60rem] text-left">
+      <table className="w-full min-w-[68rem] text-left">
         <thead className="bg-surface-alt text-xs text-ink-muted">
           <tr>
+            <th className="px-3 py-2">Tipo di pagina</th>
             <th className="px-3 py-2">Template</th>
             <th className="px-3 py-2">Pagine</th>
             <th className="px-3 py-2">Core Web Vitals</th>
@@ -204,6 +229,7 @@ export function TemplateTable({
               key={summary.pattern}
               summary={summary}
               onDiagnose={onDiagnose}
+              onTypeChange={onTypeChange}
               diagnosing={diagnosing.has(summary.pattern)}
               diagnosed={diagnosed.has(summary.pattern)}
             />

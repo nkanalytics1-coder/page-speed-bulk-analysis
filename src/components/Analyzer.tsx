@@ -70,10 +70,58 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+/** Intestazione numerata di uno step, con la spiegazione di cosa fa. */
+function StepHeading({
+  number,
+  title,
+  description,
+  aside,
+}: {
+  number: number;
+  title: string;
+  description: string;
+  aside?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="text-base">
+          <span className="mr-2 inline-flex size-6 items-center justify-center rounded-full bg-surface-alt text-sm text-ink-muted">
+            {number}
+          </span>
+          {title}
+        </h2>
+        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-muted">
+          {description}
+        </p>
+      </div>
+      {aside}
+    </div>
+  );
+}
+
+/** Etichetta di un campo, con la riga che spiega cosa scriverci. */
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm">{label}</label>
+      <p className="mt-0.5 text-xs leading-relaxed text-ink-faint">{hint}</p>
+      <div className="mt-2">{children}</div>
+    </div>
+  );
+}
+
 export function Analyzer() {
   const [sitemapInput, setSitemapInput] = useState("");
   const [urlsText, setUrlsText] = useState("");
-  const [competitorsText, setCompetitorsText] = useState("");
   const [samplesPerTemplate, setSamplesPerTemplate] = useState(3);
   const [formFactor, setFormFactor] = useState<FormFactor>("PHONE");
 
@@ -86,8 +134,13 @@ export function Analyzer() {
   const [cruxResults, setCruxResults] = useState<Record<string, CruxResult>>({});
   const [cruxMisses, setCruxMisses] = useState<CruxMiss[]>([]);
   const [scannedTemplates, setScannedTemplates] = useState<Template[]>([]);
-  const [competitorRows, setCompetitorRows] = useState<CompetitorRow[]>([]);
+  const [templateTypes, setTemplateTypes] = useState<Record<string, string>>({});
   const [cacheHits, setCacheHits] = useState(0);
+
+  const [competitorsText, setCompetitorsText] = useState("");
+  const [competitorPage, setCompetitorPage] = useState("");
+  const [competitorRows, setCompetitorRows] = useState<CompetitorRow[]>([]);
+  const [comparing, setComparing] = useState(false);
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [diagnosing, setDiagnosing] = useState<Set<string>>(new Set());
@@ -113,10 +166,11 @@ export function Analyzer() {
           template.sample
             .map((url) => cruxResults[cruxKey(url, formFactor)])
             .filter((result): result is CruxResult => Boolean(result)),
+          templateTypes[template.pattern],
         ),
       ),
     );
-  }, [scannedTemplates, cruxResults, formFactor]);
+  }, [scannedTemplates, cruxResults, formFactor, templateTypes]);
 
   const lighthouseRuns = useMemo(
     () =>
@@ -153,7 +207,7 @@ export function Analyzer() {
       setUrlsText(data.urls.join("\n"));
       setMessage(
         `${data.urls.length} URL importati da ${data.sitemap}${
-          data.truncated ? " (elenco troncato)" : ""
+          data.truncated ? " (elenco troncato a 300)" : ""
         }.`,
       );
     } catch {
@@ -163,14 +217,14 @@ export function Analyzer() {
     }
   }, [sitemapInput]);
 
-  /* ------------------------------------------------------- scansione */
+  /* ------------------------------------------------------------- CrUX */
 
   /** Interroga CrUX passando prima dalla cache locale. */
   const fetchCrux = useCallback(
     async (
       targets: string[],
       factor: FormFactor,
-      onProgress: (done: number) => void,
+      onProgress?: (done: number) => void,
     ): Promise<{ results: CruxResult[]; misses: CruxMiss[]; fromCache: number }> => {
       const results: CruxResult[] = [];
       const misses: CruxMiss[] = [];
@@ -184,7 +238,7 @@ export function Analyzer() {
           results.push(cached.value);
           fromCache += 1;
           done += 1;
-          onProgress(done);
+          onProgress?.(done);
         } else {
           pending.push(url);
         }
@@ -215,11 +269,11 @@ export function Analyzer() {
           }
           misses.push(...data.misses);
         } catch {
-          setError("Errore durante la scansione CrUX.");
+          setError("Errore durante la richiesta dei dati di campo.");
           break;
         }
         done += batch.length;
-        onProgress(done);
+        onProgress?.(done);
       }
 
       return { results, misses, fromCache };
@@ -246,21 +300,15 @@ export function Analyzer() {
     setSelectedKey(null);
 
     const currentTemplates = templates;
-    const sampleUrls = currentTemplates.flatMap((template) => template.sample);
-    const competitors = parseUrls(competitorsText);
-    // Il confronto ha senso solo a parità di oggetto: mettiamo a fianco dei
-    // competitor la nostra prima URL, che è quasi sempre la home.
-    const selfTarget = competitors.length > 0 ? urls[0] : null;
-
-    const allTargets = [
-      ...new Set([...sampleUrls, ...(selfTarget ? [selfTarget] : []), ...competitors]),
+    const sampleUrls = [
+      ...new Set(currentTemplates.flatMap((template) => template.sample)),
     ];
-    setScanProgress({ done: 0, total: allTargets.length });
+    setScanProgress({ done: 0, total: sampleUrls.length });
 
     const { results, misses, fromCache } = await fetchCrux(
-      allTargets,
+      sampleUrls,
       formFactor,
-      (done) => setScanProgress({ done, total: allTargets.length }),
+      (done) => setScanProgress({ done, total: sampleUrls.length }),
     );
 
     const byKey: Record<string, CruxResult> = {};
@@ -271,34 +319,65 @@ export function Analyzer() {
     setCruxResults(byKey);
     setCruxMisses(misses);
     setScannedTemplates(currentTemplates);
+    // I tipi dedotti diventano il valore iniziale, poi restano quelli scelti.
+    setTemplateTypes((current) => {
+      const next = { ...current };
+      for (const template of currentTemplates) {
+        if (!next[template.pattern]) next[template.pattern] = template.suggestedType;
+      }
+      return next;
+    });
     setCacheHits(fromCache);
+    setScanning(false);
+  }, [fetchCrux, formFactor, templates, urls]);
 
-    if (competitors.length > 0 && selfTarget) {
-      const rows: CompetitorRow[] = [];
-      const own = byKey[cruxKey(selfTarget, formFactor)] ?? null;
-      rows.push({
-        label: new URL(selfTarget).hostname,
+  /* ------------------------------------------------------- competitor */
+
+  const runComparison = useCallback(async () => {
+    const competitors = parseUrls(competitorsText);
+    if (competitors.length === 0) {
+      setError("Inserisci almeno un concorrente.");
+      return;
+    }
+
+    const own = competitorPage.trim()
+      ? parseUrls(competitorPage)[0]
+      : (urls[0] ?? null);
+
+    if (!own) {
+      setError("Indica la tua pagina da mettere a confronto.");
+      return;
+    }
+
+    setError(null);
+    setComparing(true);
+
+    const targets = [...new Set([own, ...competitors])];
+    const { results, misses } = await fetchCrux(targets, formFactor);
+    const byUrl = new Map(results.map((result) => [result.requestedUrl, result]));
+
+    const rows: CompetitorRow[] = [
+      {
+        label: new URL(own).hostname,
         isSelf: true,
-        result: own,
-        miss: own ? null : "Nessun dato di campo",
-      });
-      for (const competitor of competitors) {
-        const result = byKey[cruxKey(competitor, formFactor)] ?? null;
-        const miss = misses.find((entry) => entry.requestedUrl === competitor);
-        rows.push({
-          label: new URL(competitor).hostname,
+        result: byUrl.get(own) ?? null,
+        miss: byUrl.get(own) ? null : "Nessun dato di campo",
+      },
+      ...competitors.map((url) => {
+        const result = byUrl.get(url) ?? null;
+        const miss = misses.find((entry) => entry.requestedUrl === url);
+        return {
+          label: new URL(url).hostname,
           isSelf: false,
           result,
           miss: result ? null : (miss?.message ?? "Nessun dato di campo"),
-        });
-      }
-      setCompetitorRows(rows);
-    } else {
-      setCompetitorRows([]);
-    }
+        };
+      }),
+    ];
 
-    setScanning(false);
-  }, [competitorsText, fetchCrux, formFactor, templates, urls]);
+    setCompetitorRows(rows);
+    setComparing(false);
+  }, [competitorPage, competitorsText, fetchCrux, formFactor, urls]);
 
   /* ------------------------------------------------- diagnosi Lighthouse */
 
@@ -468,195 +547,194 @@ export function Analyzer() {
   const selectedRun = lighthouseRuns.find((run) => run.key === selectedKey) ?? null;
   const runningJobs = jobs.filter((job) => job.status === "running").length;
   const failedJobs = jobs.filter((job) => job.status === "error");
+  const scanned = summaries.length > 0;
 
   /* -------------------------------------------------------------- vista */
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {error ? (
+        <p className="rounded border border-fail bg-fail-soft px-3 py-2 text-sm text-fail">
+          {error}
+        </p>
+      ) : null}
+
+      {/* ------------------------------------------------------- Step 1 */}
       <section className="rounded-lg border border-border p-5">
-        <h2 className="text-sm text-ink-muted">1. Le pagine da controllare</h2>
-
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            type="text"
-            value={sitemapInput}
-            onChange={(event) => setSitemapInput(event.target.value)}
-            placeholder="esempio.it oppure https://esempio.it/sitemap.xml"
-            className="flex-1 rounded border border-border px-3 py-2 text-sm outline-none focus:border-accent"
-          />
-          <button
-            type="button"
-            onClick={importSitemap}
-            disabled={sitemapBusy || !sitemapInput.trim()}
-            className="rounded border border-border px-4 py-2 text-sm hover:bg-surface disabled:opacity-40"
-          >
-            {sitemapBusy ? "Leggo…" : "Importa da sitemap"}
-          </button>
-        </div>
-
-        <textarea
-          value={urlsText}
-          onChange={(event) => setUrlsText(event.target.value)}
-          rows={6}
-          spellCheck={false}
-          placeholder={"https://esempio.it/\nhttps://esempio.it/prodotti/scarpa-rossa\nhttps://esempio.it/blog/come-scegliere"}
-          className="mt-3 w-full rounded border border-border px-3 py-2 font-mono text-xs outline-none focus:border-accent"
+        <StepHeading
+          number={1}
+          title="Il tuo sito"
+          description="Indica quali pagine controllare. Lo strumento le raggruppa da solo per template, così non serve analizzarle tutte: le pagine costruite allo stesso modo hanno gli stessi problemi."
         />
 
-        {urls.length > 0 ? (
-          <div className="mt-3 rounded border border-border bg-surface px-3 py-2">
-            <p className="text-sm">
-              {urls.length} URL raggruppate in {templates.length} template.
-              Analizzandone {samplesPerTemplate} per template servono{" "}
-              <strong>{plannedAnalyses} controlli</strong> invece di {urls.length}.
-            </p>
-            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-              {templates.slice(0, 8).map((template) => (
-                <li key={template.pattern} className="text-xs text-ink-muted">
-                  <span className="font-mono">{template.pattern}</span>{" "}
-                  <span className="text-ink-faint">({template.urls.length})</span>
-                </li>
-              ))}
-              {templates.length > 8 ? (
-                <li className="text-xs text-ink-faint">
-                  e altri {templates.length - 8}
-                </li>
-              ) : null}
-            </ul>
-          </div>
-        ) : null}
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
-          <label className="flex items-center gap-2 text-sm">
-            Pagine per template
-            <select
-              value={samplesPerTemplate}
-              onChange={(event) =>
-                setSamplesPerTemplate(Number(event.target.value))
-              }
-              className="rounded border border-border px-2 py-1 text-sm"
-            >
-              {[1, 2, 3, 5, 8].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex items-center gap-2 text-sm">
-            Dispositivo
-            <select
-              value={formFactor}
-              onChange={(event) => setFormFactor(event.target.value as FormFactor)}
-              className="rounded border border-border px-2 py-1 text-sm"
-            >
-              <option value="PHONE">Mobile</option>
-              <option value="DESKTOP">Desktop</option>
-            </select>
-          </label>
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-sm text-ink-muted">
-            Competitor da confrontare (facoltativo, uno per riga)
-          </label>
-          <textarea
-            value={competitorsText}
-            onChange={(event) => setCompetitorsText(event.target.value)}
-            rows={3}
-            spellCheck={false}
-            placeholder={"concorrente1.it\nconcorrente2.it"}
-            className="mt-2 w-full rounded border border-border px-3 py-2 font-mono text-xs outline-none focus:border-accent"
-          />
-        </div>
-
-        {error ? (
-          <p className="mt-3 rounded border border-fail bg-fail-soft px-3 py-2 text-sm text-fail">
-            {error}
-          </p>
-        ) : null}
-        {message ? <p className="mt-3 text-xs text-ink-muted">{message}</p> : null}
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={startScan}
-            disabled={scanning || urls.length === 0}
-            className="rounded bg-accent px-5 py-2 text-sm text-white hover:opacity-90 disabled:opacity-40"
+        <div className="space-y-5">
+          <Field
+            label="Dominio o sitemap"
+            hint="Scrivi il dominio (esempio.it) e cerco io la sitemap nel robots.txt e nei percorsi standard. Se la conosci già, incolla direttamente l'indirizzo del file .xml."
           >
-            {scanning
-              ? `Scansione… ${scanProgress.done}/${scanProgress.total}`
-              : "Scansiona i dati reali"}
-          </button>
-          {summaries.length > 0 ? (
-            <button
-              type="button"
-              onClick={downloadExcel}
-              disabled={exporting}
-              className="rounded border border-accent px-4 py-2 text-sm text-accent hover:bg-accent-soft disabled:opacity-40"
-            >
-              {exporting ? "Preparo il file…" : "Scarica Excel"}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={async () => {
-              await cacheClear();
-              setMessage("Cache svuotata.");
-            }}
-            className="text-xs text-ink-faint underline underline-offset-2"
-          >
-            Svuota la cache
-          </button>
-        </div>
-
-        <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-          La scansione usa i dati di campo del Chrome UX Report: sono i numeri su
-          cui Google valuta davvero il sito e arrivano in meno di un secondo per
-          pagina, perché non viene eseguita nessuna simulazione. La diagnosi
-          Lighthouse, che è lenta, la lanci dopo e solo sui template che ne hanno
-          bisogno.
-        </p>
-      </section>
-
-      {summaries.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="text-sm text-ink-muted">
-              2. Dati reali degli utenti, per template
-            </h2>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-ink-faint">
-                {summaries.filter((entry) => entry.passesCwv === false).length}{" "}
-                template da sistemare
-                {cacheHits > 0 ? ` · ${cacheHits} risultati dalla cache` : ""}
-              </span>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={sitemapInput}
+                onChange={(event) => setSitemapInput(event.target.value)}
+                placeholder="esempio.it"
+                className="flex-1 rounded border border-border px-3 py-2 text-sm outline-none focus:border-accent"
+              />
               <button
                 type="button"
-                onClick={() => {
-                  for (const summary of summaries) {
-                    void diagnose(summary.pattern, summary.sampleUrls);
-                  }
-                }}
-                disabled={diagnosing.size > 0}
-                className="rounded border border-accent px-3 py-1 text-xs text-accent hover:bg-accent-soft disabled:opacity-40"
+                onClick={importSitemap}
+                disabled={sitemapBusy || !sitemapInput.trim()}
+                className="rounded border border-border px-4 py-2 text-sm hover:bg-surface disabled:opacity-40"
               >
-                Diagnosi su tutti i template ({sampleSize(scannedTemplates)}{" "}
-                pagine)
+                {sitemapBusy ? "Leggo…" : "Importa le pagine"}
               </button>
             </div>
+          </Field>
+
+          <Field
+            label="Pagine da controllare"
+            hint="Un indirizzo per riga. Si riempie da solo con il pulsante qui sopra, ma puoi anche incollare la tua lista o togliere le pagine che non ti interessano."
+          >
+            <textarea
+              value={urlsText}
+              onChange={(event) => setUrlsText(event.target.value)}
+              rows={6}
+              spellCheck={false}
+              placeholder={"https://esempio.it/\nhttps://esempio.it/prodotti/scarpa-rossa\nhttps://esempio.it/blog/come-scegliere"}
+              className="w-full rounded border border-border px-3 py-2 font-mono text-xs outline-none focus:border-accent"
+            />
+          </Field>
+
+          {urls.length > 0 ? (
+            <div className="rounded border border-border bg-surface px-3 py-2">
+              <p className="text-sm">
+                {urls.length} indirizzi, raggruppati in {templates.length} template.
+                Controllandone {samplesPerTemplate} per gruppo bastano{" "}
+                <strong>{plannedAnalyses} pagine</strong>.
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {templates.slice(0, 8).map((template) => (
+                  <li key={template.pattern} className="text-xs text-ink-muted">
+                    <span className="font-mono">{template.pattern}</span>{" "}
+                    <span className="text-ink-faint">({template.urls.length})</span>
+                  </li>
+                ))}
+                {templates.length > 8 ? (
+                  <li className="text-xs text-ink-faint">
+                    e altri {templates.length - 8}
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+            <Field
+              label="Pagine per template"
+              hint="Quante pagine controllare per ogni gruppo. Tre bastano quasi sempre."
+            >
+              <select
+                value={samplesPerTemplate}
+                onChange={(event) =>
+                  setSamplesPerTemplate(Number(event.target.value))
+                }
+                className="rounded border border-border px-2 py-1.5 text-sm"
+              >
+                {[1, 2, 3, 5, 8].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field
+              label="Dispositivo"
+              hint="Google valuta il sito sui dati mobile: parti da lì."
+            >
+              <select
+                value={formFactor}
+                onChange={(event) =>
+                  setFormFactor(event.target.value as FormFactor)
+                }
+                className="rounded border border-border px-2 py-1.5 text-sm"
+              >
+                <option value="PHONE">Mobile</option>
+                <option value="DESKTOP">Desktop</option>
+              </select>
+            </Field>
           </div>
+
+          {message ? <p className="text-xs text-ink-muted">{message}</p> : null}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={startScan}
+              disabled={scanning || urls.length === 0}
+              className="rounded bg-accent px-5 py-2 text-sm text-white hover:opacity-90 disabled:opacity-40"
+            >
+              {scanning
+                ? `Controllo… ${scanProgress.done}/${scanProgress.total}`
+                : "Controlla i dati reali"}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await cacheClear();
+                setMessage("Risultati salvati cancellati.");
+              }}
+              className="text-xs text-ink-faint underline underline-offset-2"
+            >
+              Svuota i risultati salvati
+            </button>
+          </div>
+
+          <p className="text-xs leading-relaxed text-ink-faint">
+            Questo primo controllo usa i dati degli utenti reali di Chrome: arriva
+            in pochi secondi perché non simula niente. La diagnosi vera e propria,
+            più lenta, la lanci dopo e solo dove serve.
+          </p>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------- Step 2 */}
+      {scanned ? (
+        <section className="rounded-lg border border-border p-5">
+          <StepHeading
+            number={2}
+            title="Come va il sito, per tipo di pagina"
+            description="Questi sono i dati degli utenti reali di Chrome degli ultimi 28 giorni: è su questi che Google valuta il sito. Controlla il tipo di pagina nella prima colonna e correggilo se serve: finisce nel report."
+            aside={
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-ink-faint">
+                  {summaries.filter((entry) => entry.passesCwv === false).length}{" "}
+                  da sistemare
+                  {cacheHits > 0 ? ` · ${cacheHits} già in memoria` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    for (const summary of summaries) {
+                      void diagnose(summary.pattern, summary.sampleUrls);
+                    }
+                  }}
+                  disabled={diagnosing.size > 0}
+                  className="rounded border border-accent px-3 py-1 text-xs text-accent hover:bg-accent-soft disabled:opacity-40"
+                >
+                  Diagnosi su tutti ({sampleSize(scannedTemplates)} pagine)
+                </button>
+              </div>
+            }
+          />
 
           {summaries.length > 1 &&
           summaries.every((entry) => entry.dataScope === "origin") ? (
-            <p className="rounded border border-average bg-average-soft px-3 py-2 text-sm leading-relaxed">
-              Attenzione: il Chrome UX Report non ha dati sulle singole pagine di
-              questo sito, quindi ogni riga qui sotto riporta lo stesso valore,
-              quello dell&apos;intero dominio. Il confronto fra template non dice
-              nulla. Serve traffico maggiore sulle singole pagine perché Google
-              li pubblichi; nel frattempo usa la diagnosi Lighthouse, che misura
-              davvero pagina per pagina.
+            <p className="mb-3 rounded border border-average bg-average-soft px-3 py-2 text-sm leading-relaxed">
+              Attenzione: Google non pubblica dati sulle singole pagine di questo
+              sito, quindi ogni riga qui sotto riporta lo stesso valore, quello
+              dell&apos;intero dominio. Confrontare i template fra loro non ha
+              senso. Usa la diagnosi Lighthouse, che misura pagina per pagina.
             </p>
           ) : null}
 
@@ -664,6 +742,9 @@ export function Analyzer() {
             summaries={summaries}
             diagnosing={diagnosing}
             diagnosed={diagnosed}
+            onTypeChange={(pattern, pageType) =>
+              setTemplateTypes((current) => ({ ...current, [pattern]: pageType }))
+            }
             onDiagnose={(summary) =>
               diagnose(
                 summary.pattern,
@@ -675,14 +756,14 @@ export function Analyzer() {
           />
 
           {cruxMisses.length > 0 ? (
-            <details className="rounded border border-border px-3 py-2">
+            <details className="mt-3 rounded border border-border px-3 py-2">
               <summary className="cursor-pointer text-xs text-ink-muted">
-                {cruxMisses.length} pagine senza dati di campo
+                {cruxMisses.length} pagine senza dati reali
               </summary>
               <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-                Il Chrome UX Report pubblica i dati solo per pagine con traffico
-                sufficiente. Per queste puoi comunque lanciare la diagnosi
-                Lighthouse, che non ha questo limite ma è una simulazione.
+                Google pubblica questi dati solo per pagine con traffico
+                sufficiente. Su queste puoi comunque lanciare la diagnosi
+                Lighthouse, che non ha questo limite.
               </p>
               <ul className="mt-2 space-y-0.5">
                 {cruxMisses.slice(0, 20).map((miss) => (
@@ -693,28 +774,93 @@ export function Analyzer() {
               </ul>
             </details>
           ) : null}
-        </section>
-      ) : null}
 
-      {competitorRows.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-sm text-ink-muted">3. Confronto con i competitor</h2>
-          <CompetitorTable rows={competitorRows} />
-        </section>
-      ) : null}
-
-      {jobs.length > 0 ? (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="text-sm text-ink-muted">4. Diagnosi Lighthouse</h2>
-            <span className="text-xs text-ink-faint">
-              {jobs.filter((job) => job.status === "done").length} / {jobs.length}
-              {runningJobs > 0 ? ` · ${runningJobs} in corso` : ""}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={downloadExcel}
+              disabled={exporting}
+              className="rounded border border-accent px-4 py-2 text-sm text-accent hover:bg-accent-soft disabled:opacity-40"
+            >
+              {exporting ? "Preparo il file…" : "Scarica il report Excel"}
+            </button>
+            <span className="ml-3 text-xs text-ink-faint">
+              Include tutto quello che hai raccolto finora.
             </span>
           </div>
+        </section>
+      ) : null}
+
+      {/* ------------------------------------------------------- Step 3 */}
+      {scanned ? (
+        <section className="rounded-lg border border-border p-5">
+          <StepHeading
+            number={3}
+            title="Confronto con i concorrenti"
+            description="Facoltativo, e puoi farlo anche in un secondo momento. Il confronto si basa sui dati degli utenti reali, quindi è immediato e non consuma analisi."
+          />
+
+          <div className="space-y-5">
+            <Field
+              label="Concorrenti"
+              hint="Un sito per riga. Puoi scrivere solo il dominio (concorrente.it) per confrontare l'intero sito, oppure l'indirizzo di una pagina precisa se vuoi mettere a confronto pagine dello stesso tipo — la tua scheda prodotto contro la loro."
+            >
+              <textarea
+                value={competitorsText}
+                onChange={(event) => setCompetitorsText(event.target.value)}
+                rows={3}
+                spellCheck={false}
+                placeholder={"concorrente1.it\nconcorrente2.it\nhttps://concorrente3.it/prodotti/qualcosa"}
+                className="w-full rounded border border-border px-3 py-2 font-mono text-xs outline-none focus:border-accent"
+              />
+            </Field>
+
+            <Field
+              label="La tua pagina da confrontare"
+              hint={`Lascia vuoto per usare ${urls[0] ? shortUrl(urls[0], 40) : "la prima pagina dell'elenco"}. Compila solo se vuoi confrontare una pagina specifica, dello stesso tipo di quelle dei concorrenti.`}
+            >
+              <input
+                type="text"
+                value={competitorPage}
+                onChange={(event) => setCompetitorPage(event.target.value)}
+                placeholder={urls[0] ?? "https://esempio.it/"}
+                className="w-full rounded border border-border px-3 py-2 font-mono text-xs outline-none focus:border-accent"
+              />
+            </Field>
+
+            <button
+              type="button"
+              onClick={runComparison}
+              disabled={comparing || !competitorsText.trim()}
+              className="rounded bg-accent px-5 py-2 text-sm text-white hover:opacity-90 disabled:opacity-40"
+            >
+              {comparing ? "Confronto…" : "Confronta"}
+            </button>
+
+            {competitorRows.length > 0 ? (
+              <CompetitorTable rows={competitorRows} />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ------------------------------------------------------- Step 4 */}
+      {jobs.length > 0 ? (
+        <section className="rounded-lg border border-border p-5">
+          <StepHeading
+            number={4}
+            title="Diagnosi: cosa correggere"
+            description="Qui Lighthouse ha simulato il caricamento delle pagine per capire perché sono lente. Gli interventi sono ordinati per impatto: i primi valgono più degli ultimi."
+            aside={
+              <span className="text-xs text-ink-faint">
+                {jobs.filter((job) => job.status === "done").length} / {jobs.length}
+                {runningJobs > 0 ? ` · ${runningJobs} in corso` : ""}
+              </span>
+            }
+          />
 
           {failedJobs.length > 0 ? (
-            <details className="rounded border border-fail bg-fail-soft px-3 py-2">
+            <details className="mb-4 rounded border border-fail bg-fail-soft px-3 py-2">
               <summary className="cursor-pointer text-xs text-fail">
                 {failedJobs.length} analisi non riuscite
               </summary>
@@ -729,7 +875,7 @@ export function Analyzer() {
           ) : null}
 
           {lighthouseRuns.length > 0 && !selectedRun ? (
-            <>
+            <div className="space-y-4">
               <div className="flex flex-wrap gap-6 rounded-lg border border-border p-5">
                 {CATEGORY_IDS.map((category) => {
                   const scores = lighthouseRuns
@@ -792,7 +938,7 @@ export function Analyzer() {
                   </tbody>
                 </table>
               </div>
-            </>
+            </div>
           ) : null}
 
           {selectedRun ? (
