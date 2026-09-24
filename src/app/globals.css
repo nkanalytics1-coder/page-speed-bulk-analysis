@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Tema chiaro fisso: nessuna variante dark, come da regole di progetto.
+ * La palata di colori replica quella del report Lighthouse ufficiale.
+ */
+@theme {
+  --color-background: #ffffff;
+  --color-surface: #f8f9fa;
+  --color-surface-alt: #f1f3f4;
+  --color-border: #e3e6e8;
+  --color-border-strong: #c7ccd1;
+  --color-ink: #1f2933;
+  --color-ink-muted: #5f6771;
+  --color-ink-faint: #8a9199;
+
+  --color-pass: #0cce6b;
+  --color-pass-soft: #e9f7ef;
+  --color-average: #ffa400;
+  --color-average-soft: #fff6e5;
+  --color-fail: #ff4e42;
+  --color-fail-soft: #fdecea;
+  --color-accent: #1a73e8;
+  --color-accent-soft: #e8f0fe;
+
+  --font-sans: var(--font-open-sans), system-ui, sans-serif;
+}
+
+/*
+ * Un solo peso in tutta l'interfaccia: Open Sans Light 300.
+ * La gerarchia visiva è costruita con dimensione e colore, non con il peso.
+ */
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: var(--color-background);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-ink);
+  font-weight: 300;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+th,
+strong,
+b,
+button,
+label {
+  font-weight: 300;
+}
+
+/* Anello del gauge Lighthouse: un conic-gradient guidato da --gauge-value. */
+@utility gauge-ring {
+  background: conic-gradient(
+    var(--gauge-color) calc(var(--gauge-value) * 1%),
+    var(--gauge-track) 0
+  );
+}
+
+/* Barra di avanzamento indeterminata durante l'analisi di una pagina. */
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+@utility animate-sweep {
+  animation: sweep 1.4s ease-in-out infinite;
+}
+
+/* Le tabelle di dettaglio Lighthouse possono essere larghe: scroll orizzontale. */
+@utility scroll-shadow {
+  background:
+    linear-gradient(to right, var(--color-background) 30%, transparent),
+    linear-gradient(to right, transparent, var(--color-background) 70%) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 2rem 100%;
+  background-attachment: local, local;
+}
