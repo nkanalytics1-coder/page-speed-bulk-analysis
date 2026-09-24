@@ -4,6 +4,23 @@ Analizza la velocità di più pagine di un sito in una sola sessione con il moto
 Lighthouse di Google, e scarica le azioni correttive in un Excel ordinato per
 priorità.
 
+## Come funziona, in due fasi
+
+**Fase 1 — scansione dei dati reali (secondi).** Lo strumento raggruppa le URL
+della sitemap per template, ne campiona alcune per gruppo, e interroga l'API
+Chrome UX Report. Sono i dati di campo su cui Google valuta il sito, e arrivano
+in circa 0,02 secondi per URL perché non viene eseguita nessuna simulazione. Su
+un sito da 300 pagine: 8 template, 30 controlli, mezzo secondo.
+
+**Fase 2 — diagnosi Lighthouse (minuti, e solo dove serve).** Lighthouse è
+l'unico che dice *perché* una pagina è lenta, ma costa 30 secondi a pagina. Lo
+lanci dal pulsante accanto al template che vuoi approfondire, sulle sole pagine
+campionate.
+
+Il risparmio viene dal campionamento: le pagine dello stesso template hanno gli
+stessi problemi, perché il problema sta nel template. Su smashingmagazine.com si
+passa da 300 analisi a 24, su vercel.com da 500 a 50.
+
 ## Cosa fa
 
 - **Analisi in blocco** — incolla un elenco di URL, o importali automaticamente
@@ -131,6 +148,28 @@ Controlla fra l'altro che le curve di scoring riproducano i punti di controllo
 di Lighthouse, che i pesi di ogni categoria sommino a 1, che le metriche non
 finiscano fra le azioni, e che il payload compresso resti sotto il limite di
 4,5 MB di Vercel nel caso peggiore ammesso dalla UI.
+
+## Il limite più importante da conoscere
+
+**Il Chrome UX Report pubblica i dati per singola URL solo per pagine con
+traffico molto alto.** Nei test su siti grandi e noti — Smashing Magazine, MDN —
+nessuna pagina profonda aveva dati propri: tutte ricadevano sul valore
+dell'intero dominio. Quando succede, ogni riga della tabella per template
+riporta lo stesso numero, e confrontare i template fra loro non dice nulla.
+
+Lo strumento lo dichiara esplicitamente: la riga mostra "dato dell'intero sito",
+l'Excel ha una colonna "Origine del dato" che lo scrive per esteso, e se *tutti*
+i template ricadono sull'origin compare un avviso sopra la tabella.
+
+Di conseguenza:
+
+- I dati di campo servono per il **verdetto sul sito** e per il **confronto con
+  i competitor**, dove il dato di dominio è esattamente quello che vuoi.
+- Il raggruppamento per template serve soprattutto a **decidere dove puntare
+  Lighthouse**, riducendo centinaia di analisi a qualche decina.
+- Se i dati per pagina non ci sono, usa il pulsante "Diagnosi su tutti i
+  template": Lighthouse misura pagina per pagina e non ha questo limite, al
+  prezzo di essere una simulazione.
 
 ## Limiti
 

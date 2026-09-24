@@ -15,14 +15,37 @@ piano di intervento ordinato per impatto, scaricabile in Excel.
 
 ## Struttura directory
 - `src/app/` — pagine e route handler
-  - `api/analyze/` — una singola chiamata PageSpeed Insights
+  - `api/crux/` — dati di campo in blocco (veloce)
+  - `api/analyze/` — una singola chiamata PageSpeed Insights (lenta)
   - `api/sitemap/` — estrae gli URL da sitemap.xml / robots.txt
   - `api/export/` — genera il file Excel
 - `src/components/` — UI (client components)
 - `src/lib/` — logica pura, testabile senza server
-- `scripts/` — smoke test e fixture
+- `scripts/` — smoke test, verifica dei template, fixture
 
 ## Architettura — perché è fatta così
+
+**Due fonti, due fasi.** L'API Chrome UX Report (`src/lib/crux.ts`) dà i dati di
+campo in circa 0,02s per URL senza simulare nulla: è la scansione larga.
+Lighthouse via PageSpeed Insights costa ~30s a pagina ma spiega *perché* una
+pagina è lenta: è la diagnosi mirata, lanciata solo sui template che servono.
+Non invertire l'ordine.
+
+**Il campionamento per template** (`src/lib/templates.ts`) raggruppa le URL con
+un albero dei percorsi che collassa in `*` i segmenti variabili. La regola non è
+"molti fratelli" ma "molti fratelli **in rapporto** alle URL che passano da lì":
+50 slug sotto `/blog` su 50 URL sono un identificativo, 20 sezioni sotto la
+radice su 500 URL non lo sono. Senza il rapporto tutte le sezioni di primo
+livello finirebbero fuse in un unico template sbagliato — è successo davvero, e
+`scripts/template-check.mts` serve a verificare il risultato su sitemap reali
+prima di fidarsi.
+
+**I dati CrUX per singola URL spesso non esistono.** Google li pubblica solo per
+pagine con traffico alto: nei test su Smashing Magazine e MDN nessuna pagina
+profonda ne aveva. Il client ripiega sull'origin e lo dichiara in
+`CruxResult.scope`, che diventa `TemplateSummary.dataScope`. Quando è `origin`
+per tutti i template i numeri sono identici fra loro e non vanno confrontati:
+UI ed Excel devono continuare a dirlo in modo evidente, non nasconderlo.
 
 **Lighthouse non gira su Vercel.** Usiamo la PageSpeed Insights API v5, che
 restituisce il `lighthouseResult` completo: stessi audit, stessi punteggi,

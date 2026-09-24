@@ -4,6 +4,8 @@ import { learnMoreUrl, stripMarkdown } from "./export-payload";
 import { CATEGORY_MULTIPLIERS, buildActionPlan } from "./priority";
 import { CATEGORY_IDS, CATEGORY_LABELS } from "./types";
 import type { ActionItem, CategoryId, RunResult } from "./types";
+import type { CruxResult } from "./crux";
+import type { TemplateSummary } from "./template-summary";
 
 const FONT = "Open Sans";
 
@@ -432,6 +434,21 @@ function addMethodSheet(
 
   const rows: [string, string][] = [
     ["Generato il", new Date().toLocaleString("it-IT")],
+    ["", ""],
+    ["DUE FONTI DIVERSE, NON CONFONDERLE", ""],
+    [
+      "Dati di campo (CrUX)",
+      "Foglio \"Template (dati reali)\" e \"Confronto competitor\". Sono le misure degli utenti reali di Chrome negli ultimi 28 giorni, al 75° percentile. Sono i numeri su cui Google valuta il sito e su cui si decide se i Core Web Vitals sono superati. Esistono solo per pagine con traffico sufficiente.",
+    ],
+    [
+      "Dati di laboratorio (Lighthouse)",
+      "Tutti gli altri fogli. Sono una simulazione su rete e CPU emulate, eseguita al momento. Servono a capire PERCHÉ una pagina è lenta e cosa correggere, non a misurarne le prestazioni reali. Due esecuzioni sulla stessa pagina possono differire di qualche punto.",
+    ],
+    [
+      "Ambito del dato di campo",
+      "Quando CrUX non ha dati sulla singola pagina, il tool ripiega sulla media dell'intero sito e lo dichiara nella colonna \"Origine del dato\". Se tutti i template riportano lo stesso valore, è questo il motivo: non confrontarli fra loro.",
+    ],
+    ["", ""],
     ["Pagine analizzate", String(pages)],
     ["Analisi totali (pagina × dispositivo)", String(runs.length)],
     ["Azioni nel piano", String(itemCount)],
@@ -504,22 +521,263 @@ function addMethodSheet(
 }
 
 /* ------------------------------------------------------------------ *
+ * Fogli dei dati di campo
+ * ------------------------------------------------------------------ */
+
+function cwvFill(rating: string | undefined): string | null {
+  if (rating === "good") return COLORS.pass;
+  if (rating === "needs-improvement") return COLORS.average;
+  if (rating === "poor") return COLORS.fail;
+  return null;
+}
+
+type CoreId =
+  | "largest_contentful_paint"
+  | "interaction_to_next_paint"
+  | "cumulative_layout_shift";
+
+function addTemplateSheet(
+  workbook: ExcelJS.Workbook,
+  templates: TemplateSummary[],
+  formFactor: string,
+) {
+  const sheet = workbook.addWorksheet("Template (dati reali)");
+  const device = formFactor === "DESKTOP" ? "Desktop" : "Mobile";
+
+  sheet.columns = [
+    { header: "Template", key: "label", width: 28 },
+    { header: "Percorso", key: "pattern", width: 32 },
+    { header: "Pagine nel sito", key: "totalUrls", width: 11 },
+    { header: "Pagine analizzate", key: "sampled", width: 11 },
+    { header: "Core Web Vitals", key: "cwv", width: 16 },
+    { header: "LCP mediana p75 (ms)", key: "lcp", width: 13 },
+    { header: "INP mediana p75 (ms)", key: "inp", width: 13 },
+    { header: "CLS mediana p75", key: "cls", width: 13 },
+    { header: "FCP (ms)", key: "fcp", width: 11 },
+    { header: "TTFB (ms)", key: "ttfb", width: 11 },
+    { header: "Collo di bottiglia LCP", key: "phase", width: 22 },
+    { header: "Quota della fase", key: "phaseShare", width: 11 },
+    { header: "Cosa fare", key: "hint", width: 72 },
+    { header: "Dati propri della pagina", key: "scoped", width: 12 },
+    { header: "Origine del dato", key: "origin", width: 46 },
+    { header: "Dispositivo", key: "device", width: 11 },
+  ] as Column[];
+
+  const originNote: Record<TemplateSummary["dataScope"], string> = {
+    url: "Misure delle pagine di questo template.",
+    mixed: "In parte misure di pagina, in parte media dell'intero sito.",
+    origin:
+      "ATTENZIONE: nessuna pagina di questo template ha dati propri. I valori sono la media dell'intero sito, identica per tutti i template: non usarli per confrontarli fra loro.",
+    none: "Nessun dato di campo disponibile.",
+  };
+
+  for (const template of templates) {
+    const lcp = template.metrics.largest_contentful_paint;
+    const inp = template.metrics.interaction_to_next_paint;
+    const cls = template.metrics.cumulative_layout_shift;
+
+    const row = sheet.addRow({
+      label: template.label,
+      pattern: template.pattern,
+      totalUrls: template.totalUrls,
+      sampled: template.sampled,
+      cwv:
+        template.passesCwv === true
+          ? "Superati"
+          : template.passesCwv === false
+            ? "NON superati"
+            : "Dati insufficienti",
+      lcp: lcp ? Math.round(lcp.median) : "—",
+      inp: inp ? Math.round(inp.median) : "—",
+      cls: cls ? Number(cls.median.toFixed(3)) : "—",
+      fcp: template.metrics.first_contentful_paint
+        ? Math.round(template.metrics.first_contentful_paint.median)
+        : "—",
+      ttfb: template.metrics.experimental_time_to_first_byte
+        ? Math.round(template.metrics.experimental_time_to_first_byte.median)
+        : "—",
+      phase: template.dominantLcpPhase?.label ?? "—",
+      phaseShare: template.dominantLcpPhase?.share ?? "",
+      hint: template.dominantLcpPhase?.hint ?? "",
+      scoped: `${template.urlScoped} / ${template.sampled}`,
+      origin: originNote[template.dataScope],
+      device,
+    });
+
+    if (template.dataScope === "origin") {
+      paint(row.getCell("origin"), COLORS.alta);
+    }
+
+    if (typeof row.getCell("phaseShare").value === "number") {
+      row.getCell("phaseShare").numFmt = "0%";
+    }
+
+    const verdict = row.getCell("cwv");
+    paint(
+      verdict,
+      template.passesCwv === true
+        ? COLORS.pass
+        : template.passesCwv === false
+          ? COLORS.fail
+          : COLORS.muted,
+    );
+
+    for (const [key, metric] of [
+      ["lcp", lcp],
+      ["inp", inp],
+      ["cls", cls],
+    ] as const) {
+      const fill = cwvFill(metric?.rating);
+      if (fill) paint(row.getCell(key), fill);
+    }
+  }
+
+  if (templates.length === 0) {
+    sheet.addRow({ label: "Nessuna scansione dei dati di campo effettuata." });
+  }
+
+  finalize(sheet, sheet.columnCount);
+  sheet.getColumn("hint").alignment = { wrapText: true, vertical: "top" };
+  sheet.getColumn("origin").alignment = { wrapText: true, vertical: "top" };
+}
+
+export interface CompetitorExport {
+  label: string;
+  isSelf: boolean;
+  result: CruxResult | null;
+  miss: string | null;
+}
+
+function addCompetitorSheet(
+  workbook: ExcelJS.Workbook,
+  competitors: CompetitorExport[],
+  formFactor: string,
+) {
+  if (competitors.length === 0) return;
+
+  const sheet = workbook.addWorksheet("Confronto competitor");
+
+  sheet.columns = [
+    { header: "Sito", key: "site", width: 30 },
+    { header: "È il tuo", key: "self", width: 9 },
+    { header: "Ambito del dato", key: "scope", width: 14 },
+    { header: "Core Web Vitals", key: "cwv", width: 18 },
+    { header: "LCP (ms)", key: "lcp", width: 11 },
+    { header: "Confronto LCP", key: "dLcp", width: 20 },
+    { header: "INP (ms)", key: "inp", width: 11 },
+    { header: "Confronto INP", key: "dInp", width: 20 },
+    { header: "CLS", key: "cls", width: 11 },
+    { header: "Confronto CLS", key: "dCls", width: 20 },
+    { header: "Periodo rilevazione", key: "period", width: 24 },
+    { header: "Dispositivo", key: "device", width: 11 },
+  ] as Column[];
+
+  const self = competitors.find((entry) => entry.isSelf) ?? null;
+
+  for (const entry of competitors) {
+    const value = (id: CoreId) => entry.result?.metrics[id]?.p75 ?? null;
+    const delta = (id: CoreId) => {
+      if (entry.isSelf) return "";
+      const theirs = value(id);
+      const ours = self?.result?.metrics[id]?.p75 ?? null;
+      if (theirs == null || ours == null) return "—";
+      const diff = theirs - ours;
+      const size =
+        id === "cumulative_layout_shift"
+          ? Math.abs(diff).toFixed(3)
+          : String(Math.round(Math.abs(diff)));
+      if (Number(size) === 0) return "pari";
+      // Meno è meglio su tutte e tre: se il competitor ha un valore più alto,
+      // il vantaggio è nostro.
+      return diff > 0 ? `sei avanti di ${size}` : `sei indietro di ${size}`;
+    };
+
+    const row = sheet.addRow({
+      site: entry.label,
+      self: entry.isSelf ? "sì" : "",
+      scope: entry.result
+        ? entry.result.scope === "url"
+          ? "Pagina"
+          : "Intero sito"
+        : "—",
+      cwv: entry.result
+        ? entry.result.passesCwv === true
+          ? "Superati"
+          : entry.result.passesCwv === false
+            ? "NON superati"
+            : "Dati insufficienti"
+        : (entry.miss ?? "Nessun dato"),
+      lcp: value("largest_contentful_paint") ?? "—",
+      dLcp: delta("largest_contentful_paint"),
+      inp: value("interaction_to_next_paint") ?? "—",
+      dInp: delta("interaction_to_next_paint"),
+      cls: value("cumulative_layout_shift") ?? "—",
+      dCls: delta("cumulative_layout_shift"),
+      period: entry.result?.collectionPeriod
+        ? `${entry.result.collectionPeriod.first} – ${entry.result.collectionPeriod.last}`
+        : "—",
+      device: formFactor === "DESKTOP" ? "Desktop" : "Mobile",
+    });
+
+    const verdict = row.getCell("cwv");
+    if (entry.result?.passesCwv === true) paint(verdict, COLORS.pass);
+    else if (entry.result?.passesCwv === false) paint(verdict, COLORS.fail);
+
+    for (const [key, id] of [
+      ["lcp", "largest_contentful_paint"],
+      ["inp", "interaction_to_next_paint"],
+      ["cls", "cumulative_layout_shift"],
+    ] as const) {
+      const fill = cwvFill(entry.result?.metrics[id]?.rating);
+      if (fill) paint(row.getCell(key), fill);
+    }
+  }
+
+  finalize(sheet, sheet.columnCount);
+
+  sheet.addRow({});
+  const note = sheet.addRow({
+    site:
+      "Valori al 75° percentile degli utenti reali di Chrome, ultimi 28 giorni. " +
+      'Dove l\'ambito è "Intero sito", CrUX non aveva dati sulla singola pagina: ' +
+      "il valore è quello medio del dominio e va confrontato con cautela con un dato di pagina.",
+  });
+  note.font = { name: FONT, size: 9, italic: true };
+}
+
+/* ------------------------------------------------------------------ *
  * Composizione
  * ------------------------------------------------------------------ */
 
+export interface WorkbookInput {
+  runs: RunResult[];
+  templates: TemplateSummary[];
+  competitors: CompetitorExport[];
+  formFactor: string;
+}
+
 /** Costruisce l'intera cartella di lavoro a partire dai risultati normalizzati. */
-export function buildAuditWorkbook(runs: RunResult[]): ExcelJS.Workbook {
+export function buildAuditWorkbook(input: WorkbookInput): ExcelJS.Workbook {
+  const { runs, templates, competitors, formFactor } = input;
   const plan = buildActionPlan(runs);
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Lighthouse Batch Audit";
+  workbook.creator = "Analisi velocità";
   workbook.created = new Date();
 
-  addActionPlanSheet(workbook, plan.items, plan.totalPages);
-  addSummarySheet(workbook, runs);
-  addAuditDetailSheet(workbook, runs);
-  addResourcesSheet(workbook, runs);
-  addFieldSheet(workbook, runs);
+  // I dati di campo vengono per primi: sono quelli su cui Google valuta il sito.
+  addTemplateSheet(workbook, templates, formFactor);
+  addCompetitorSheet(workbook, competitors, formFactor);
+
+  // I fogli Lighthouse compaiono solo se è stata fatta almeno una diagnosi.
+  if (runs.length > 0) {
+    addActionPlanSheet(workbook, plan.items, plan.totalPages);
+    addSummarySheet(workbook, runs);
+    addAuditDetailSheet(workbook, runs);
+    addResourcesSheet(workbook, runs);
+    addFieldSheet(workbook, runs);
+  }
+
   addMethodSheet(workbook, runs, plan.items.length);
 
   return workbook;

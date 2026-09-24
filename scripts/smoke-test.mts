@@ -215,7 +215,12 @@ console.log("  round-trip gzip verificato");
 /* 5. Generazione Excel ------------------------------------------------ */
 
 section("Generazione Excel");
-const workbook = buildAuditWorkbook(payload);
+const workbook = buildAuditWorkbook({
+  runs: payload,
+  templates: [],
+  competitors: [],
+  formFactor: "PHONE",
+});
 const buffer = await workbook.xlsx.writeBuffer();
 const outPath = join(here, "..", "smoke-output.xlsx");
 writeFileSync(outPath, Buffer.from(buffer as ArrayBuffer));
@@ -225,6 +230,7 @@ console.log(`scritto ${outPath} (${(Buffer.byteLength(Buffer.from(buffer as Arra
 const reread = new ExcelJS.Workbook();
 await reread.xlsx.readFile(outPath);
 const expectedSheets = [
+  "Template (dati reali)",
   "Piano d'azione",
   "Riepilogo pagine",
   "Dettaglio per pagina",
