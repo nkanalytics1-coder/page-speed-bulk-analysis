@@ -70,6 +70,8 @@ interface Accumulator {
   pointsSum: number;
   savingsMs: number;
   savingsBytes: number;
+  /** Somma dei moltiplicatori di importanza delle run coinvolte. */
+  importanceSum: number;
 }
 
 export interface ActionPlan {
@@ -78,7 +80,14 @@ export interface ActionPlan {
   totalRuns: number;
 }
 
-export function buildActionPlan(runs: RunResult[]): ActionPlan {
+export function buildActionPlan(
+  runs: RunResult[],
+  /**
+   * Moltiplicatore di importanza per URL, dal tipo di pagina scelto
+   * sul template. Assente significa importanza neutra.
+   */
+  importanceByUrl: Record<string, number> = {},
+): ActionPlan {
   const totalPages = new Set(runs.map((run) => run.requestedUrl)).size;
   const accumulators = new Map<string, Accumulator>();
 
@@ -103,10 +112,12 @@ export function buildActionPlan(runs: RunResult[]): ActionPlan {
           pointsSum: 0,
           savingsMs: 0,
           savingsBytes: 0,
+          importanceSum: 0,
         };
         accumulators.set(audit.id, accumulator);
       }
 
+      accumulator.importanceSum += importanceByUrl[run.requestedUrl] ?? 1;
       accumulator.occurrences += 1;
       accumulator.urls.add(run.requestedUrl);
       accumulator.strategies.add(run.strategy);
@@ -136,10 +147,21 @@ export function buildActionPlan(runs: RunResult[]): ActionPlan {
       ? Math.min(3, avgSavingsMs / 1000)
       : avgPoints;
 
+    // Importanza media delle pagine su cui l'audit fallisce: un problema che
+    // colpisce il checkout pesa più dello stesso problema su un archivio.
+    const meanImportance =
+      accumulator.occurrences > 0
+        ? accumulator.importanceSum / accumulator.occurrences
+        : 1;
+
     const priorityScore =
-      basePoints * coverage * CATEGORY_MULTIPLIERS[accumulator.category];
+      basePoints *
+      coverage *
+      CATEGORY_MULTIPLIERS[accumulator.category] *
+      meanImportance;
 
     items.push({
+      meanImportance,
       auditId: accumulator.auditId,
       title: accumulator.title,
       description: accumulator.description,

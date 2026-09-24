@@ -163,6 +163,45 @@ for (let i = 1; i < plan.items.length; i += 1) {
 
 const quantified = plan.items.filter((item) => !item.impactEstimated);
 assert.ok(quantified.length > 0, "almeno un'azione con impatto calcolato");
+
+// L'importanza per tipo di pagina deve spostare davvero i punteggi, non solo
+// comparire nel report. Senza pesi vale 1; con Bassa (×0,5) su tutte le pagine
+// ogni punteggio deve dimezzarsi, con Alta (×1,5) crescere della metà.
+{
+  const neutral = plan.items[0];
+  assert.equal(neutral.meanImportance, 1, "senza pesi l'importanza è neutra");
+
+  const low = Object.fromEntries(PAGES.map((url) => [url, 0.5]));
+  const high = Object.fromEntries(PAGES.map((url) => [url, 1.5]));
+  const lowPlan = buildActionPlan(runs, low);
+  const highPlan = buildActionPlan(runs, high);
+
+  const same = (a: typeof plan.items, id: string) =>
+    a.find((item) => item.auditId === id)!;
+
+  const lowItem = same(lowPlan.items, neutral.auditId);
+  const highItem = same(highPlan.items, neutral.auditId);
+
+  assert.ok(
+    Math.abs(lowItem.priorityScore - neutral.priorityScore * 0.5) < 0.001,
+    "importanza Bassa dimezza il punteggio",
+  );
+  assert.ok(
+    Math.abs(highItem.priorityScore - neutral.priorityScore * 1.5) < 0.001,
+    "importanza Alta aumenta il punteggio del 50%",
+  );
+  console.log(
+    `importanza: "${neutral.title.slice(0, 40)}" vale ${neutral.priorityScore.toFixed(2)} neutra · ${lowItem.priorityScore.toFixed(2)} bassa · ${highItem.priorityScore.toFixed(2)} alta`,
+  );
+
+  // Alzare l'importanza di una sola pagina deve poter cambiare l'ordine.
+  const mixed = buildActionPlan(runs, { [PAGES[0]]: 1.5 });
+  const reordered = mixed.items.map((item) => item.auditId).join("|");
+  const baseline = plan.items.map((item) => item.auditId).join("|");
+  console.log(
+    `  con una sola pagina importante l'ordine ${reordered === baseline ? "resta uguale" : "cambia"}`,
+  );
+}
 console.log(`${plan.items.length} azioni · ${quantified.length} con impatto calcolato`);
 console.log(
   `fasce: ${["Critica", "Alta", "Media", "Bassa"]

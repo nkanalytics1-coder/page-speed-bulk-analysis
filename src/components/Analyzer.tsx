@@ -24,7 +24,12 @@ import {
 import { shortUrl } from "@/lib/format";
 import { buildActionPlan } from "@/lib/priority";
 import { groupByTemplate, sampleSize, type Template } from "@/lib/templates";
-import { sortByUrgency, summarizeTemplate } from "@/lib/template-summary";
+import type { Importance } from "@/lib/templates";
+import {
+  importanceByUrl,
+  sortByUrgency,
+  summarizeTemplate,
+} from "@/lib/template-summary";
 import { CATEGORY_IDS, CATEGORY_LABELS } from "@/lib/types";
 import type { AnalyzeResponse, RunResult, Strategy } from "@/lib/types";
 
@@ -135,6 +140,11 @@ export function Analyzer() {
   const [cruxMisses, setCruxMisses] = useState<CruxMiss[]>([]);
   const [scannedTemplates, setScannedTemplates] = useState<Template[]>([]);
   const [templateTypes, setTemplateTypes] = useState<Record<string, string>>({});
+  // Solo le importanze impostate a mano: le altre seguono il tipo di pagina,
+  // così cambiare il tipo aggiorna anche l'importanza proposta.
+  const [importanceOverrides, setImportanceOverrides] = useState<
+    Record<string, Importance>
+  >({});
   const [cacheHits, setCacheHits] = useState(0);
 
   const [competitorsText, setCompetitorsText] = useState("");
@@ -167,10 +177,17 @@ export function Analyzer() {
             .map((url) => cruxResults[cruxKey(url, formFactor)])
             .filter((result): result is CruxResult => Boolean(result)),
           templateTypes[template.pattern],
+          importanceOverrides[template.pattern],
         ),
       ),
     );
-  }, [scannedTemplates, cruxResults, formFactor, templateTypes]);
+  }, [
+    scannedTemplates,
+    cruxResults,
+    formFactor,
+    templateTypes,
+    importanceOverrides,
+  ]);
 
   const lighthouseRuns = useMemo(
     () =>
@@ -180,7 +197,10 @@ export function Analyzer() {
     [jobs],
   );
 
-  const plan = useMemo(() => buildActionPlan(lighthouseRuns), [lighthouseRuns]);
+  const plan = useMemo(
+    () => buildActionPlan(lighthouseRuns, importanceByUrl(summaries)),
+    [lighthouseRuns, summaries],
+  );
 
   /* ---------------------------------------------------------- sitemap */
 
@@ -704,7 +724,7 @@ export function Analyzer() {
           <StepHeading
             number={2}
             title="Come va il sito, per tipo di pagina"
-            description="Questi sono i dati degli utenti reali di Chrome degli ultimi 28 giorni: è su questi che Google valuta il sito. Controlla il tipo di pagina nella prima colonna e correggilo se serve: finisce nel report."
+            description="Questi sono i dati degli utenti reali di Chrome degli ultimi 28 giorni: è su questi che Google valuta il sito. Nelle prime due colonne controlla il tipo di pagina e quanto conta per il tuo business: il tipo finisce nel report, l'importanza decide l'ordine degli interventi. Un secondo perso sul checkout non vale quanto un secondo perso su un archivio di tag, e questo solo tu puoi saperlo."
             aside={
               <div className="flex items-center gap-3">
                 <span className="text-xs text-ink-faint">
@@ -744,6 +764,12 @@ export function Analyzer() {
             diagnosed={diagnosed}
             onTypeChange={(pattern, pageType) =>
               setTemplateTypes((current) => ({ ...current, [pattern]: pageType }))
+            }
+            onImportanceChange={(pattern, importance) =>
+              setImportanceOverrides((current) => ({
+                ...current,
+                [pattern]: importance,
+              }))
             }
             onDiagnose={(summary) =>
               diagnose(

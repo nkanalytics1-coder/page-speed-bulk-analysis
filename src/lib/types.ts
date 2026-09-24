@@ -180,6 +180,11 @@ export interface ActionItem {
   totalSavingsBytes: number;
   /** Frazione di pagine analizzate coinvolte (0-1). */
   coverage: number;
+  /**
+   * Importanza media delle pagine coinvolte, come moltiplicatore (0,5-1,5).
+   * Vale 1 quando il tipo di pagina non è stato impostato.
+   */
+  meanImportance: number;
   /** Punteggio finale di priorità (0-100 circa). */
   priorityScore: number;
   priorityBand: "Critica" | "Alta" | "Media" | "Bassa";

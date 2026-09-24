@@ -35,6 +35,11 @@ function Row({ item, rank }: { item: ActionItem; rank: number }) {
           <span className="text-sm">{item.title}</span>
           <span className="mt-0.5 block text-xs text-ink-faint">
             {CATEGORY_LABELS[item.category]}
+            {item.meanImportance > 1.2
+              ? " · su pagine importanti"
+              : item.meanImportance < 0.8
+                ? " · su pagine secondarie"
+                : ""}
             {item.impactEstimated ? " · impatto stimato dal tempo" : ""}
           </span>
         </td>

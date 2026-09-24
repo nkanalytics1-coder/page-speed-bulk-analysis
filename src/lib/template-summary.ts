@@ -9,7 +9,8 @@ import {
   type CruxResult,
   type LcpPhaseId,
 } from "./crux";
-import type { Template } from "./templates";
+import { DEFAULT_IMPORTANCE, IMPORTANCE_MULTIPLIERS } from "./templates";
+import type { Importance, PageType, Template } from "./templates";
 
 /**
  * Sintesi dei dati di campo per template.
@@ -32,6 +33,8 @@ export interface TemplateSummary {
   label: string;
   /** Tipo di pagina: proposto dall'euristica, confermato o corretto dall'utente. */
   pageType: string;
+  /** Quanto conta che questo template sia veloce, per il business. */
+  importance: Importance;
   /** URL totali del sito che ricadono in questo template. */
   totalUrls: number;
   /** URL effettivamente interrogate. */
@@ -102,7 +105,12 @@ export function summarizeTemplate(
   results: CruxResult[],
   /** Tipo scelto dall'utente; in assenza si usa quello dedotto dal percorso. */
   pageType?: string,
+  /** Importanza scelta dall'utente; in assenza si deriva dal tipo di pagina. */
+  importance?: Importance,
 ): TemplateSummary {
+  const type = pageType ?? template.suggestedType;
+  const weight =
+    importance ?? DEFAULT_IMPORTANCE[type as PageType] ?? "Media";
   const metrics: TemplateSummary["metrics"] = {};
 
   for (const id of ALL_METRICS) {
@@ -182,7 +190,8 @@ export function summarizeTemplate(
   return {
     pattern: template.pattern,
     label: template.label,
-    pageType: pageType ?? template.suggestedType,
+    pageType: type,
+    importance: weight,
     totalUrls: template.urls.length,
     sampled: template.sample.length,
     withData: results.length,
@@ -202,14 +211,34 @@ export function summarizeTemplate(
 
 /**
  * Ordina i template per urgenza: prima quelli che non superano i CWV, e fra
- * questi quelli che coprono più pagine, perché una correzione sul template
- * più diffuso vale di più.
+ * questi quelli che pesano di più, cioè diffusione per importanza. Una
+ * correzione su un template diffuso e importante vale più di una su un
+ * archivio secondario.
  */
 export function sortByUrgency(summaries: TemplateSummary[]): TemplateSummary[] {
   const rank = (summary: TemplateSummary) =>
     summary.passesCwv === false ? 0 : summary.passesCwv === null ? 1 : 2;
 
+  const weight = (summary: TemplateSummary) =>
+    summary.totalUrls * IMPORTANCE_MULTIPLIERS[summary.importance];
+
   return [...summaries].sort(
-    (a, b) => rank(a) - rank(b) || b.totalUrls - a.totalUrls,
+    (a, b) => rank(a) - rank(b) || weight(b) - weight(a),
   );
+}
+
+/**
+ * Moltiplicatore di importanza per ogni URL campionata, da passare al piano
+ * d'azione: è il ponte fra la scelta fatta sul template e il peso dei singoli
+ * audit Lighthouse, che vengono misurati per pagina.
+ */
+export function importanceByUrl(
+  summaries: TemplateSummary[],
+): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const summary of summaries) {
+    const multiplier = IMPORTANCE_MULTIPLIERS[summary.importance];
+    for (const url of summary.sampleUrls) map[url] = multiplier;
+  }
+  return map;
 }

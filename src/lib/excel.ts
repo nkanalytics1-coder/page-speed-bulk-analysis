@@ -101,6 +101,7 @@ function addActionPlanSheet(
     { header: "Azione da fare", key: "title", width: 52 },
     { header: "Pagine coinvolte", key: "pages", width: 10 },
     { header: "% pagine", key: "coverage", width: 9 },
+    { header: "Importanza media pagine", key: "importance", width: 12 },
     { header: "Run coinvolte", key: "occurrences", width: 9 },
     { header: "Punteggio medio audit", key: "avgScore", width: 11 },
     { header: "Punti recuperabili (media pagina)", key: "avgPoints", width: 13 },
@@ -124,6 +125,7 @@ function addActionPlanSheet(
       title: item.title,
       pages: item.pagesAffected,
       coverage: item.coverage,
+      importance: Number(item.meanImportance.toFixed(2)),
       occurrences: item.occurrences,
       avgScore: item.avgScore == null ? "—" : Math.round(item.avgScore * 100),
       avgPoints: Number(item.avgPointsRecoverable.toFixed(2)),
@@ -143,6 +145,7 @@ function addActionPlanSheet(
 
     paint(row.getCell("band"), bandColor(item.priorityBand));
     row.getCell("coverage").numFmt = "0%";
+    row.getCell("importance").numFmt = "0.00";
     row.getCell("score").numFmt = "0.00";
     row.getCell("avgPoints").numFmt = "0.00";
     row.getCell("totalPoints").numFmt = "0.00";
@@ -458,7 +461,11 @@ function addMethodSheet(
     ["COME SI LEGGE LA PRIORITÀ", ""],
     [
       "Punteggio priorità",
-      "punti recuperabili medi per pagina × quota di pagine coinvolte × moltiplicatore di categoria. Scala indicativa 0-100, indipendente dal numero di pagine analizzate.",
+      "punti recuperabili medi per pagina × quota di pagine coinvolte × moltiplicatore di categoria × importanza media delle pagine coinvolte. Scala indicativa 0-100, indipendente dal numero di pagine analizzate.",
+    ],
+    [
+      "Importanza delle pagine",
+      "Ogni template ha un'importanza per il business (Alta ×1,5 · Media ×1 · Bassa ×0,5), proposta dal tipo di pagina e modificabile. Serve a distinguere un secondo perso sul checkout da un secondo perso su un archivio di tag: Lighthouse li tratta uguali, il fatturato no. Il valore proposto è tarato su un sito che vende: su un editoriale va corretto.",
     ],
     [
       "Punti recuperabili — Prestazioni",
@@ -546,6 +553,7 @@ function addTemplateSheet(
 
   sheet.columns = [
     { header: "Tipo di pagina", key: "pageType", width: 22 },
+    { header: "Importanza", key: "importance", width: 11 },
     { header: "Template", key: "label", width: 26 },
     { header: "Percorso", key: "pattern", width: 30 },
     { header: "Pagine nel sito", key: "totalUrls", width: 11 },
@@ -579,6 +587,7 @@ function addTemplateSheet(
 
     const row = sheet.addRow({
       pageType: template.pageType,
+      importance: template.importance,
       label: template.label,
       pattern: template.pattern,
       totalUrls: template.totalUrls,
@@ -608,6 +617,11 @@ function addTemplateSheet(
 
     if (template.dataScope === "origin") {
       paint(row.getCell("origin"), COLORS.alta);
+    }
+    if (template.importance === "Alta") {
+      paint(row.getCell("importance"), COLORS.critica);
+    } else if (template.importance === "Bassa") {
+      paint(row.getCell("importance"), COLORS.muted);
     }
 
     if (typeof row.getCell("phaseShare").value === "number") {

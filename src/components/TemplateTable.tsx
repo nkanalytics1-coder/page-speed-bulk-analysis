@@ -5,7 +5,8 @@ import { CwvBadge, CwvHeaderCells, LcpPhaseBar, MetricFromSummary } from "./CwvB
 import { CWV_COLUMNS } from "./CwvBits";
 import { METRIC_FULL_LABELS, formatMetric } from "@/lib/crux";
 import { shortUrl } from "@/lib/format";
-import { PAGE_TYPES } from "@/lib/templates";
+import { IMPORTANCE_LEVELS, PAGE_TYPES } from "@/lib/templates";
+import type { Importance } from "@/lib/templates";
 import type { TemplateSummary } from "@/lib/template-summary";
 
 interface Props {
@@ -14,21 +15,31 @@ interface Props {
   onDiagnose: (summary: TemplateSummary) => void;
   /** Correzione del tipo di pagina proposto dall'euristica. */
   onTypeChange: (pattern: string, pageType: string) => void;
+  /** Correzione dell'importanza per il business. */
+  onImportanceChange: (pattern: string, importance: Importance) => void;
   /** Pattern dei template già diagnosticati o in corso. */
   diagnosing: Set<string>;
   diagnosed: Set<string>;
 }
 
+const IMPORTANCE_STYLES: Record<Importance, string> = {
+  Alta: "border-fail text-fail",
+  Media: "border-border text-ink",
+  Bassa: "border-border text-ink-faint",
+};
+
 function Row({
   summary,
   onDiagnose,
   onTypeChange,
+  onImportanceChange,
   diagnosing,
   diagnosed,
 }: {
   summary: TemplateSummary;
   onDiagnose: (summary: TemplateSummary) => void;
   onTypeChange: (pattern: string, pageType: string) => void;
+  onImportanceChange: (pattern: string, importance: Importance) => void;
   diagnosing: boolean;
   diagnosed: boolean;
 }) {
@@ -49,6 +60,23 @@ function Row({
             {PAGE_TYPES.map((type) => (
               <option key={type} value={type}>
                 {type}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
+          <select
+            value={summary.importance}
+            onChange={(event) =>
+              onImportanceChange(summary.pattern, event.target.value as Importance)
+            }
+            className={`w-full rounded border bg-background px-2 py-1 text-sm ${
+              IMPORTANCE_STYLES[summary.importance]
+            }`}
+          >
+            {IMPORTANCE_LEVELS.map((level) => (
+              <option key={level} value={level}>
+                {level}
               </option>
             ))}
           </select>
@@ -105,7 +133,7 @@ function Row({
 
       {open ? (
         <tr className="border-t border-border bg-surface">
-          <td colSpan={9} className="px-3 py-4">
+          <td colSpan={10} className="px-3 py-4">
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
                 <h4 className="mb-2 text-xs text-ink-muted">
@@ -204,6 +232,7 @@ export function TemplateTable({
   summaries,
   onDiagnose,
   onTypeChange,
+  onImportanceChange,
   diagnosing,
   diagnosed,
 }: Props) {
@@ -211,10 +240,13 @@ export function TemplateTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[68rem] text-left">
+      <table className="w-full min-w-[74rem] text-left">
         <thead className="bg-surface-alt text-xs text-ink-muted">
           <tr>
             <th className="px-3 py-2">Tipo di pagina</th>
+            <th className="px-3 py-2" title="Quanto conta per il business che queste pagine siano veloci. Incide sull'ordine degli interventi.">
+              Importanza
+            </th>
             <th className="px-3 py-2">Template</th>
             <th className="px-3 py-2">Pagine</th>
             <th className="px-3 py-2">Core Web Vitals</th>
@@ -230,6 +262,7 @@ export function TemplateTable({
               summary={summary}
               onDiagnose={onDiagnose}
               onTypeChange={onTypeChange}
+              onImportanceChange={onImportanceChange}
               diagnosing={diagnosing.has(summary.pattern)}
               diagnosed={diagnosed.has(summary.pattern)}
             />

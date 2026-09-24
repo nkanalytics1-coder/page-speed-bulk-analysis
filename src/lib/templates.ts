@@ -67,6 +67,44 @@ export const PAGE_TYPES = [
 
 export type PageType = (typeof PAGE_TYPES)[number];
 
+/** Quanto conta, per il business, che questo tipo di pagina sia veloce. */
+export const IMPORTANCE_LEVELS = ["Alta", "Media", "Bassa"] as const;
+
+export type Importance = (typeof IMPORTANCE_LEVELS)[number];
+
+/**
+ * Moltiplicatori applicati al punteggio di priorità.
+ *
+ * Servono a distinguere un secondo perso sul checkout da un secondo perso su
+ * un archivio di tag: Lighthouse li tratta uguali, il fatturato no.
+ */
+export const IMPORTANCE_MULTIPLIERS: Record<Importance, number> = {
+  Alta: 1.5,
+  Media: 1,
+  Bassa: 0.5,
+};
+
+/**
+ * Importanza proposta per ciascun tipo di pagina.
+ *
+ * È un punto di partenza ragionevole per un sito che vende, non una verità:
+ * su un editoriale l'articolo vale quanto la home. Va corretta dall'utente,
+ * che è l'unico a sapere da dove arrivano i suoi soldi.
+ */
+export const DEFAULT_IMPORTANCE: Record<PageType, Importance> = {
+  Home: "Alta",
+  "Scheda prodotto": "Alta",
+  "Categoria / listing": "Alta",
+  "Checkout / carrello": "Alta",
+  "Landing page": "Alta",
+  "Articolo / blog": "Media",
+  Ricerca: "Media",
+  Documentazione: "Media",
+  Istituzionale: "Bassa",
+  "Archivio (tag, autore)": "Bassa",
+  Altro: "Media",
+};
+
 /** Segmenti di percorso che rivelano il tipo di pagina. */
 const SEGMENT_TYPES: Record<string, PageType> = {
   prodotto: "Scheda prodotto",
